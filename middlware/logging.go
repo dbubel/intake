@@ -32,12 +32,12 @@ func Logging(l *logrus.Logger, levels LogLevel) func(handler intake.Handler) int
 				}
 				printLog := func() {
 					l.WithFields(logrus.Fields{
-						"method":         r.Method,
-						"requestUri":     r.RequestURI,
-						"contentLen":     r.ContentLength,
+						"method":           r.Method,
+						"requestUri":       r.RequestURI,
+						"contentLen":       r.ContentLength,
 						"responseLenBytes": responseLength,
-						"responseTimeMs": time.Now().Sub(t).Milliseconds(),
-						"code":           code,
+						"responseTimeMs":   time.Now().Sub(t).Milliseconds(),
+						"code":             code,
 					}).Info("handled request")
 				}
 				if code < 100 {

@@ -2,7 +2,7 @@ package middlware
 
 import (
 	"context"
-	"github.com/bf-dbubel/intake"
+	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"time"

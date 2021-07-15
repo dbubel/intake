@@ -1,7 +1,7 @@
 package middlware
 
 import (
-	"github.com/bf-dbubel/intake"
+	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
 	"net/http"

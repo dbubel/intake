@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/bf-dbubel/intake/middlware"
+	"github.com/dbubel/intake/middlware"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"runtime"
 	"time"
 
-	"github.com/bf-dbubel/intake"
+	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 )
 

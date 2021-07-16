@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	middleware "github.com/dbubel/intake/middlware"
 	"net/http"
 	"runtime"
 	"time"
 
-	"github.com/dbubel/intake/middlware"
+	"github.com/dbubel/intake"
 	"github.com/sirupsen/logrus"
 
-	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -37,13 +37,13 @@ func main() {
 	})
 
 	app := intake.New(apiLogger)
-	app.GlobalMiddleware(middlware.Logging(apiLogger, middlware.LogLevel{
+	app.GlobalMiddleware(middleware.Logging(apiLogger, middleware.LogLevel{
 		Log100s: true,
 		Log200s: true,
 		Log300s: true,
 		Log400s: true,
 		Log500s: true,
-	}), middlware.Recover)
+	}), middleware.Recover)
 	app.AddEndpoint(http.MethodGet, "/test-get", testSimple)
 	app.Run(&http.Server{
 		Addr:           ":8000",

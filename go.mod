@@ -3,7 +3,6 @@ module github.com/dbubel/intake
 go 1.16
 
 require (
-	github.com/dbubel/intake v0.0.0-20210715205202-884c839741a1
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/julienschmidt/httprouter v1.3.0

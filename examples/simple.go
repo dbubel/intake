@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	middleware "github.com/dbubel/intake/middleware"
+	"github.com/dbubel/intake/middleware"
 	"net/http"
 	"runtime"
 	"time"
@@ -28,8 +28,8 @@ func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 func main() {
 
 	apiLogger := logrus.New()
-	apiLogger.SetReportCaller(true)
 	apiLogger.SetLevel(logrus.DebugLevel)
+	apiLogger.SetReportCaller(true)
 	apiLogger.SetFormatter(&logrus.JSONFormatter{
 		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
 			return "", fmt.Sprintf("%s:%d", f.File, f.Line)
@@ -44,7 +44,13 @@ func main() {
 		Log400s: true,
 		Log500s: true,
 	}), middleware.Recover)
-	app.AddEndpoint(http.MethodGet, "/test-get", testSimple)
+	eps := intake.Endpoints{
+		intake.NewEndpoint(http.MethodGet, "/test-get", testSimple),
+	}
+	app.AddEndpoints(eps)
+
+
+
 	app.Run(&http.Server{
 		Addr:           ":8000",
 		Handler:        app.Router,

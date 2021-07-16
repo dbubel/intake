@@ -3,6 +3,7 @@ package intake
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 )
 
@@ -37,8 +38,14 @@ func RespondXML(w http.ResponseWriter, r *http.Request, code int, data interface
 }
 
 func Respond(w http.ResponseWriter, r *http.Request, code int, data []byte) (int, error) {
-	AddToContext(r, "response-code", code)
-	AddToContext(r, "response-length", len(data))
+	err := AddToContext(r, "response-code", code)
+	if err != nil {
+		fmt.Println("adding", err.Error())
+	}
+	err = AddToContext(r, "response-length", len(data))
+	if err != nil {
+		fmt.Println("adding 1", err.Error())
+	}
 	contentType := http.DetectContentType(data)
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(code)

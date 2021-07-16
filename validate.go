@@ -2,6 +2,7 @@ package intake
 
 import (
 	"fmt"
+
 	"github.com/go-playground/validator"
 )
 

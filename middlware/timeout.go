@@ -2,10 +2,11 @@ package middlware
 
 import (
 	"context"
-	"github.com/dbubel/intake"
-	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"time"
+
+	"github.com/dbubel/intake"
+	"github.com/julienschmidt/httprouter"
 )
 
 // Timeout if added will created a context that will cancel after t. This cancel

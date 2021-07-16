@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/dbubel/intake/middlware"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/dbubel/intake/middlware"
+	"github.com/sirupsen/logrus"
 
 	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
@@ -18,7 +19,6 @@ type test struct {
 }
 
 func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	time.Sleep(time.Second)
 	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
 		"status": "OK",
 	})

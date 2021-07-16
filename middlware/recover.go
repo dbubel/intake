@@ -2,9 +2,10 @@ package middlware
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
-	"net/http"
 )
 
 // Recover needs to be the first middleware in chain

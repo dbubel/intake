@@ -1,11 +1,12 @@
 package middlware
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
-	"net/http"
-	"time"
 )
 
 type LogLevel struct {

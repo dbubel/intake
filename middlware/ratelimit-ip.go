@@ -2,12 +2,13 @@ package middlware
 
 import (
 	"fmt"
-	"github.com/dbubel/intake"
-	"github.com/julienschmidt/httprouter"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/dbubel/intake"
+	"github.com/julienschmidt/httprouter"
 )
 
 // RateLimitIP with limit requests that use this middleware to n requests per second

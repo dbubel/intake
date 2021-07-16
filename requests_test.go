@@ -2,14 +2,15 @@ package intake
 
 import (
 	"fmt"
-	"github.com/julienschmidt/httprouter"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/julienschmidt/httprouter"
+	"github.com/stretchr/testify/assert"
 )
 
 func init() {

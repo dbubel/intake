@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	middleware "github.com/dbubel/intake/middlware"
+	middleware "github.com/dbubel/intake/middleware"
 	"net/http"
 	"runtime"
 	"time"

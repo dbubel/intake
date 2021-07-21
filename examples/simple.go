@@ -37,19 +37,18 @@ func main() {
 	})
 
 	app := intake.New(apiLogger)
-	app.GlobalMiddleware(middleware.Logging(apiLogger, middleware.LogLevel{
+	eps := intake.Endpoints{
+		intake.NewEndpoint(http.MethodGet, "/test-get", testSimple),
+	}
+	eps.Use(middleware.Logging(apiLogger, middleware.LogLevel{
 		Log100s: true,
 		Log200s: true,
 		Log300s: true,
 		Log400s: true,
 		Log500s: true,
-	}), middleware.Recover)
-	eps := intake.Endpoints{
-		intake.NewEndpoint(http.MethodGet, "/test-get", testSimple),
-	}
+	}))
+	eps.Use(middleware.Timeout(time.Second * 2))
 	app.AddEndpoints(eps)
-
-
 
 	app.Run(&http.Server{
 		Addr:           ":8000",

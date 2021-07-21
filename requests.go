@@ -1,9 +1,7 @@
 package intake
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,22 +28,20 @@ func UnmarshalJSON(r io.Reader, v interface{}) error {
 }
 
 func AddToContext(r *http.Request, key string, v interface{}) error {
-	var b bytes.Buffer
-	e := gob.NewEncoder(&b)
-	if err := e.Encode(v); err != nil {
+	encoded, err := json.Marshal(v)
+	if err != nil {
 		return err
 	}
-	*r = *r.WithContext(context.WithValue(r.Context(), key, b))
+	*r = *r.WithContext(context.WithValue(r.Context(), key, encoded))
 	return nil
 }
 
 func FromContext(r *http.Request, key string, v interface{}) error {
-	data, ok := r.Context().Value(key).(bytes.Buffer)
+	data, ok := r.Context().Value(key).([]byte)
 	if !ok {
-		return fmt.Errorf("error casting from context for (%s)", key)
+		return fmt.Errorf("error casting to []byte for key %s", key)
 	}
-	d := gob.NewDecoder(&data)
-	if err := d.Decode(v); err != nil {
+	if err := json.Unmarshal(data, v); err != nil {
 		return err
 	}
 	return nil

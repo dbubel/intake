@@ -18,7 +18,8 @@ func Timeout(t time.Duration) func(handler intake.Handler) intake.Handler {
 			// cancel at the specified duration.
 			ctx, cancel := context.WithTimeout(r.Context(), t)
 			defer cancel()
-			next(w, r.WithContext(ctx), params)
+			*r = *r.WithContext(ctx)
+			next(w, r, params)
 		}
 	}
 }

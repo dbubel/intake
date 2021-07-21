@@ -1,12 +1,11 @@
 package middleware
 
 import (
-	"net/http"
-	"time"
-
 	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
+	"net/http"
+	"time"
 )
 
 type LogLevel struct {
@@ -21,6 +20,7 @@ func Logging(l *logrus.Logger, levels LogLevel) func(handler intake.Handler) int
 	return func(next intake.Handler) intake.Handler {
 		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			t := time.Now()
+
 			defer func() {
 				var code int
 				if err := intake.FromContext(r, "response-code", &code); err != nil {
@@ -31,6 +31,7 @@ func Logging(l *logrus.Logger, levels LogLevel) func(handler intake.Handler) int
 				if err := intake.FromContext(r, "response-length", &responseLength); err != nil {
 					l.WithError(err).Error("error getting response length from context")
 				}
+
 				printLog := func() {
 					l.WithFields(logrus.Fields{
 						"method":           r.Method,
@@ -54,7 +55,6 @@ func Logging(l *logrus.Logger, levels LogLevel) func(handler intake.Handler) int
 				} else if code >= 500 && levels.Log500s {
 					printLog()
 				}
-
 			}()
 
 			next(w, r, params)

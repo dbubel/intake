@@ -2,7 +2,6 @@ package intake
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"net/http"
 )
 
@@ -14,19 +13,6 @@ func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interfac
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		resp, _ := json.Marshal(map[string]string{
-			"error":       err.Error(),
-			"description": "error marshalling response to JSON",
-		})
-		return Respond(w, r, http.StatusInternalServerError, resp)
-
-	}
-	return Respond(w, r, code, jsonData)
-}
-
-func RespondXML(w http.ResponseWriter, r *http.Request, code int, data interface{}) (int, error) {
-	jsonData, err := xml.Marshal(data)
-	if err != nil {
-		resp, _ := xml.Marshal(map[string]string{
 			"error":       err.Error(),
 			"description": "error marshalling response to JSON",
 		})

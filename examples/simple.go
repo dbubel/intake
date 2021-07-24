@@ -19,10 +19,41 @@ type test struct {
 }
 
 func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	fmt.Println("handle")
+	defer func() {
+		var s int
+		intake.FromContext(r, "response-code", &s)
+		fmt.Printf("handle leave [%d]\n", s)
+	}()
 	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
 		"status": "OK",
 	})
 	return
+}
+
+func mw1(next intake.Handler) intake.Handler {
+	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		fmt.Println("m1")
+		defer func() {
+			var s int
+			intake.FromContext(r, "response-code", &s)
+			fmt.Printf("mw1 leave [%d]\n", s)
+		}()
+		next(w, r, params)
+	}
+}
+
+func mw2(next intake.Handler) intake.Handler {
+	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		fmt.Println("m2")
+		defer func() {
+
+			var s int
+			intake.FromContext(r, "response-code", &s)
+			fmt.Printf("mw2 leave [%d]\n", s)
+		}()
+		next(w, r, params)
+	}
 }
 
 func main() {
@@ -40,14 +71,17 @@ func main() {
 	eps := intake.Endpoints{
 		intake.NewEndpoint(http.MethodGet, "/test-get", testSimple),
 	}
-	eps.Use(middleware.Logging(apiLogger, middleware.LogLevel{
+
+	loggingMw := middleware.Logging(apiLogger, middleware.LogLevel{
 		Log100s: true,
 		Log200s: true,
 		Log300s: true,
 		Log400s: true,
 		Log500s: true,
-	}))
-	eps.Use(middleware.Timeout(time.Second * 2))
+	})
+
+
+	eps.Use(loggingMw)
 	app.AddEndpoints(eps)
 
 	app.Run(&http.Server{

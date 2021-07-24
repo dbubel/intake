@@ -14,22 +14,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//var apiLogger *logrus.Logger
-
 type Handler func(w http.ResponseWriter, r *http.Request, params httprouter.Params)
 type MiddleWare func(Handler) Handler
 
 type Intake struct {
-	Router            *httprouter.Router
-	globalMiddlewares []MiddleWare
-	logger            *logrus.Logger
+	Router *httprouter.Router
+	logger *logrus.Logger
 }
 
 func New(log *logrus.Logger) *Intake {
 	return &Intake{
-		Router:            httprouter.New(),
-		globalMiddlewares: make([]MiddleWare, 0, 0),
-		logger:            log,
+		Router: httprouter.New(),
+		logger: log,
 	}
 }
 
@@ -44,14 +40,9 @@ func NewDefault() *Intake {
 		},
 	})
 	return &Intake{
-		Router:            httprouter.New(),
-		globalMiddlewares: make([]MiddleWare, 0, 0),
-		logger:            apiLogger,
+		Router: httprouter.New(),
+		logger: apiLogger,
 	}
-}
-
-func (a *Intake) GlobalMiddleware(mid ...MiddleWare) {
-	a.globalMiddlewares = mid
 }
 
 func (a *Intake) AddEndpoints(e ...Endpoints) {
@@ -67,13 +58,6 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, mid
 	for i := len(middleware) - 1; i >= 0; i-- {
 		if middleware[i] != nil {
 			finalHandler = middleware[i](finalHandler)
-		}
-	}
-
-	// Wrap handler in global middleware
-	for i := len(a.globalMiddlewares) - 1; i >= 0; i-- {
-		if a.globalMiddlewares[i] != nil {
-			finalHandler = a.globalMiddlewares[i](finalHandler)
 		}
 	}
 

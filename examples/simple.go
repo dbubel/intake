@@ -19,12 +19,6 @@ type test struct {
 }
 
 func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	fmt.Println("handle")
-	defer func() {
-		var s int
-		intake.FromContext(r, "response-code", &s)
-		fmt.Printf("handle leave [%d]\n", s)
-	}()
 	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
 		"status": "OK",
 	})
@@ -69,7 +63,7 @@ func main() {
 
 	app := intake.New(apiLogger)
 	eps := intake.Endpoints{
-		intake.NewEndpoint(http.MethodGet, "/test-get", testSimple),
+		intake.GET("/test-get", testSimple),
 	}
 
 	loggingMw := middleware.Logging(apiLogger, middleware.LogLevel{
@@ -79,7 +73,6 @@ func main() {
 		Log400s: true,
 		Log500s: true,
 	})
-
 
 	eps.Use(loggingMw)
 	app.AddEndpoints(eps)

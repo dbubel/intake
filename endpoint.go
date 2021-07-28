@@ -37,4 +37,3 @@ func DELETE(path string, endpointHandler Handler, mid ...MiddleWare) endpoint {
 func PATCH(path string, endpointHandler Handler, mid ...MiddleWare) endpoint {
 	return NewEndpoint(http.MethodPatch, path, endpointHandler, mid...)
 }
-

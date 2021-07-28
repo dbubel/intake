@@ -63,7 +63,7 @@ func main() {
 
 	app := intake.New(apiLogger)
 	eps := intake.Endpoints{
-		intake.GET("/test-get", testSimple),
+		intake.GET("/test-get", testSimple, mw1),
 	}
 
 	loggingMw := middleware.Logging(apiLogger, middleware.LogLevel{
@@ -74,7 +74,9 @@ func main() {
 		Log500s: true,
 	})
 
-	eps.Use(loggingMw)
+	//eps.Use(loggingMw)
+	app.AddGlobal(loggingMw)
+
 	app.AddEndpoints(eps)
 
 	app.Run(&http.Server{

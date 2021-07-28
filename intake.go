@@ -18,14 +18,16 @@ type Handler func(w http.ResponseWriter, r *http.Request, params httprouter.Para
 type MiddleWare func(Handler) Handler
 
 type Intake struct {
-	Router *httprouter.Router
-	logger *logrus.Logger
+	Router   *httprouter.Router
+	logger   *logrus.Logger
+	GlobalMw []MiddleWare
 }
 
 func New(log *logrus.Logger) *Intake {
 	return &Intake{
-		Router: httprouter.New(),
-		logger: log,
+		Router:   httprouter.New(),
+		logger:   log,
+		GlobalMw: make([]MiddleWare, 0, 0),
 	}
 }
 
@@ -44,6 +46,9 @@ func NewDefault() *Intake {
 		logger: apiLogger,
 	}
 }
+func (a *Intake) AddGlobal(mw MiddleWare) {
+	a.GlobalMw = append(a.GlobalMw, mw)
+}
 
 func (a *Intake) AddEndpoints(e ...Endpoints) {
 	for x := 0; x < len(e); x++ {
@@ -55,6 +60,7 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, middleware ...MiddleWare) {
 	// Wrap all the route specific middleware
+	middleware = append(middleware, a.GlobalMw...)
 	for i := len(middleware) - 1; i >= 0; i-- {
 		if middleware[i] != nil {
 			finalHandler = middleware[i](finalHandler)

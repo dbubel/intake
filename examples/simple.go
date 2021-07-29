@@ -5,6 +5,7 @@ import (
 	"github.com/dbubel/intake/middleware"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/dbubel/intake"
@@ -57,7 +58,8 @@ func main() {
 	apiLogger.SetReportCaller(true)
 	apiLogger.SetFormatter(&logrus.JSONFormatter{
 		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-			return "", fmt.Sprintf("%s:%d", f.File, f.Line)
+			s := strings.Split(f.File, "/")[len(strings.Split(f.File, "/"))-1]
+			return "", fmt.Sprintf("%s:%d", s, f.Line)
 		},
 	})
 
@@ -73,9 +75,10 @@ func main() {
 		Log400s: true,
 		Log500s: true,
 	})
+	_ = loggingMw
 
-	//eps.Use(loggingMw)
 	app.AddGlobal(loggingMw)
+	app.AddGlobal(mw2)
 
 	app.AddEndpoints(eps)
 

@@ -77,7 +77,7 @@ func main() {
 	})
 	_ = loggingMw
 
-	app.AddGlobal(loggingMw)
+	//app.AddGlobal(loggingMw)
 	app.AddGlobal(mw2)
 
 	app.AddEndpoints(eps)

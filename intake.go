@@ -59,16 +59,11 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 }
 
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, middleware ...MiddleWare) {
-	// Wrap all the route specific middleware
-	// Wrap all the route specific middleware with global middleware
-	for i := range a.GlobalMw {
-		asdf := []MiddleWare{a.GlobalMw[i]}
-		middleware = append(asdf, middleware...)
-	}
-	//middleware = append(middleware, a.GlobalMw...)
-	for i := len(middleware) - 1; i >= 0; i-- {
-		if middleware[i] != nil {
-			finalHandler = middleware[i](finalHandler)
+	// Prepend the global middlewares to the route specific middleware
+	mws := append(a.GlobalMw, middleware...)
+	for i := len(mws) - 1; i >= 0; i-- {
+		if mws[i] != nil {
+			finalHandler = mws[i](finalHandler)
 		}
 	}
 

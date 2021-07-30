@@ -25,12 +25,12 @@ func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interfac
 func Respond(w http.ResponseWriter, r *http.Request, code int, data []byte) (int, error) {
 	err := AddToContext(r, "response-code", code)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	err = AddToContext(r, "response-length", len(data))
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 	contentType := http.DetectContentType(data)
 	w.Header().Set("Content-Type", contentType)

@@ -9,7 +9,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// RateLimit with limit requests that use this middleware to n requests per second
+// RateLimit will limit requests that use this middleware to n requests per second
 func RateLimit(n float64) func(handler intake.Handler) intake.Handler {
 	var lastRequestTime = time.Now()
 	return func(next intake.Handler) intake.Handler {

@@ -11,7 +11,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-// RateLimitIP with limit requests that use this middleware to n requests per second
+// RateLimitIP limit the number of requests per second per IP
 func RateLimitIP(n float64) func(handler intake.Handler) intake.Handler {
 	var ipMap map[string]time.Time
 	ipMap = make(map[string]time.Time)

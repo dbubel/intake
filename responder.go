@@ -17,7 +17,6 @@ func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interfac
 			"description": "error marshalling response to JSON",
 		})
 		return Respond(w, r, http.StatusInternalServerError, resp)
-
 	}
 	return Respond(w, r, code, jsonData)
 }

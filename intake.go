@@ -46,6 +46,7 @@ func NewDefault() *Intake {
 		logger: apiLogger,
 	}
 }
+
 func (a *Intake) AddGlobal(mw MiddleWare) {
 	a.GlobalMw = append(a.GlobalMw, mw)
 }
@@ -60,6 +61,7 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, middleware ...MiddleWare) {
 	// Prepend the global middlewares to the route specific middleware
+	// global middleware will be called first in the chain in the order they are added
 	mws := append(a.GlobalMw, middleware...)
 	for i := len(mws) - 1; i >= 0; i-- {
 		if mws[i] != nil {

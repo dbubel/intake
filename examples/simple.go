@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/dbubel/intake/middleware"
 	"net/http"
 	"runtime"
 	"strings"
@@ -65,28 +64,19 @@ func main() {
 
 	app := intake.New(apiLogger)
 	eps := intake.Endpoints{
-		intake.GET("/test-get", testSimple, mw1),
+		intake.GET("/test-get", testSimple),
 	}
 
-	loggingMw := middleware.Logging(apiLogger, middleware.LogLevel{
-		Log100s: true,
-		Log200s: true,
-		Log300s: true,
-		Log400s: true,
-		Log500s: true,
-	})
-	_ = loggingMw
-
-	//app.AddGlobal(loggingMw)
+	app.AddGlobal(app.Logging)
 	app.AddGlobal(mw2)
-
+	app.AddGlobal(mw1)
 	app.AddEndpoints(eps)
 
 	app.Run(&http.Server{
 		Addr:           ":8000",
 		Handler:        app.Router,
-		ReadTimeout:    time.Second * 10,
-		WriteTimeout:   time.Second * 10,
+		ReadTimeout:    time.Second * 30,
+		WriteTimeout:   time.Second * 30,
 		MaxHeaderBytes: 1 << 20,
 	})
 }

@@ -3,12 +3,13 @@ package intake
 import (
 	"context"
 	"fmt"
-	"github.com/julienschmidt/httprouter"
-	"github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/julienschmidt/httprouter"
+	"github.com/sirupsen/logrus"
 )
 
 func (a *Intake) Logging(next Handler) Handler {
@@ -39,12 +40,13 @@ func (a *Intake) Logging(next Handler) Handler {
 	}
 }
 
-// Recover needs to be the first middleware in chain
+// Recover avoids the application panicing if if any calls to the route cause one
 func (a *Intake) Recover(next Handler) Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		defer func() {
 			if err := recover(); err != nil {
 				RespondError(w, r, fmt.Errorf("error panic"), http.StatusInternalServerError, "server recovered from a panic")
+				a.logger.WithFields(logrus.Fields{"panic": err}).Error("recovered from panic")
 			}
 		}()
 		next(w, r, params)
@@ -60,6 +62,7 @@ func (a *Intake) RateLimit(n float64) func(handler Handler) Handler {
 			lastRequestTime = time.Now()
 			if requestsPerSecond > n {
 				RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
+				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond}).Warn("rate limited")
 				return
 			}
 			next(w, r, params)
@@ -97,6 +100,7 @@ func (a *Intake) RateLimitIP(n float64) func(handler Handler) Handler {
 			ipMap[requestIp] = time.Now()
 			if requestsPerSecond > n {
 				RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
+				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond, "ip": requestIp}).Warn("ip rate limited")
 				return
 			}
 			next(w, r, params)

@@ -18,6 +18,7 @@ func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interfac
 		})
 		return Respond(w, r, http.StatusInternalServerError, resp)
 	}
+	w.Header().Set("Content-Type", "application/json")
 	return Respond(w, r, code, jsonData)
 }
 
@@ -31,8 +32,12 @@ func Respond(w http.ResponseWriter, r *http.Request, code int, data []byte) (int
 	if err != nil {
 		return -1, err
 	}
-	contentType := http.DetectContentType(data)
-	w.Header().Set("Content-Type", contentType)
+
+	// content type is not set so attempt to set it
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", http.DetectContentType(data))
+	}
+
 	w.WriteHeader(code)
 	return w.Write(data)
 }

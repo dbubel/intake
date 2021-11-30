@@ -67,7 +67,9 @@ func main() {
 		intake.GET("/test-get", testSimple),
 	}
 
-	app.AddGlobal(app.Logging)
+	mw := Middleware{logger: apiLogger}
+
+	app.AddGlobal(mw.Logging)
 	app.AddGlobal(mw2)
 	app.AddGlobal(mw1)
 	app.AddEndpoints(eps)

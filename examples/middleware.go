@@ -1,4 +1,4 @@
-package intake
+package main
 
 import (
 	"context"
@@ -8,21 +8,30 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dbubel/intake"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
 )
 
-func (a *Intake) Logging(next Handler) Handler {
+// These are example middlewares
+// These are not production tested. Please do your own testing of these before using them in a
+// production environment.
+
+type Middleware struct {
+	logger *logrus.Logger
+}
+
+func (a *Middleware) Logging(next intake.Handler) intake.Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		t := time.Now()
 		defer func() {
 			var code int
-			if err := FromContext(r, "response-code", &code); err != nil {
+			if err := intake.FromContext(r, "response-code", &code); err != nil {
 				a.logger.WithError(err).Error("error getting response code from context")
 			}
 
 			var responseLength int
-			if err := FromContext(r, "response-length", &responseLength); err != nil {
+			if err := intake.FromContext(r, "response-length", &responseLength); err != nil {
 				a.logger.WithError(err).Error("error getting response length from context")
 			}
 
@@ -40,12 +49,12 @@ func (a *Intake) Logging(next Handler) Handler {
 	}
 }
 
-// Recover avoids the application panicing if if any calls to the route cause one
-func (a *Intake) Recover(next Handler) Handler {
+// Recover avoids the application panicing if any calls to the route cause one
+func (a *Middleware) Recover(next intake.Handler) intake.Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		defer func() {
 			if err := recover(); err != nil {
-				RespondError(w, r, fmt.Errorf("error panic"), http.StatusInternalServerError, "server recovered from a panic")
+				intake.RespondError(w, r, fmt.Errorf("error panic"), http.StatusInternalServerError, "server recovered from a panic")
 				a.logger.WithFields(logrus.Fields{"panic": err}).Error("recovered from panic")
 			}
 		}()
@@ -54,14 +63,14 @@ func (a *Intake) Recover(next Handler) Handler {
 }
 
 // RateLimit will limit requests that use this middleware to n requests per second
-func (a *Intake) RateLimit(n float64) func(handler Handler) Handler {
+func (a *Middleware) RateLimit(n float64) func(handler intake.Handler) intake.Handler {
 	var lastRequestTime = time.Now()
-	return func(next Handler) Handler {
+	return func(next intake.Handler) intake.Handler {
 		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			requestsPerSecond := 1 / time.Now().Sub(lastRequestTime).Seconds()
 			lastRequestTime = time.Now()
 			if requestsPerSecond > n {
-				RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
+				intake.RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
 				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond}).Warn("rate limited")
 				return
 			}
@@ -71,7 +80,7 @@ func (a *Intake) RateLimit(n float64) func(handler Handler) Handler {
 }
 
 // RateLimitIP limit the number of requests per second per IP
-func (a *Intake) RateLimitIP(n float64) func(handler Handler) Handler {
+func (a *Middleware) RateLimitIP(n float64) func(handler intake.Handler) intake.Handler {
 	var ipMap map[string]time.Time
 	ipMap = make(map[string]time.Time)
 
@@ -86,7 +95,7 @@ func (a *Intake) RateLimitIP(n float64) func(handler Handler) Handler {
 
 		return "noip"
 	}
-	return func(next Handler) Handler {
+	return func(next intake.Handler) intake.Handler {
 		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			var requestsPerSecond float64
 			requestIp := fn(r.RemoteAddr)
@@ -99,7 +108,7 @@ func (a *Intake) RateLimitIP(n float64) func(handler Handler) Handler {
 
 			ipMap[requestIp] = time.Now()
 			if requestsPerSecond > n {
-				RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
+				intake.RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
 				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond, "ip": requestIp}).Warn("ip rate limited")
 				return
 			}
@@ -110,8 +119,8 @@ func (a *Intake) RateLimitIP(n float64) func(handler Handler) Handler {
 
 // Timeout if added will created a context that will cancel after t. This cancel
 // will affect all downstream uses of the context
-func (a *Intake) Timeout(t time.Duration) func(handler Handler) Handler {
-	return func(next Handler) Handler {
+func (a *Middleware) Timeout(t time.Duration) func(handler intake.Handler) intake.Handler {
+	return func(next intake.Handler) intake.Handler {
 		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			// Create a context that is both manually cancellable and will signal
 			// cancel at the specified duration.

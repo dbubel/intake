@@ -120,21 +120,3 @@ func finalHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 ```
 
-#### Timeout middlware
-```go
-func somethingslow(ctx context.Context) string {
-	select {
-	case <-ctx.Done():
-		return "done"
-	case <-time.After(5 * time.Second):
-		return "after"
-		// The above channel simulates some hard work.
-	}
-}
-func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	intake.Respond(w, r, http.StatusOK, []byte(somethingslow(r.Context())))
-	return
-}
-...
-app.AddEndpoint(http.MethodGet, "/test-get", testSimple, middlware.Timeout(time.Millisecond*3000))
-```

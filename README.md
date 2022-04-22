@@ -78,7 +78,7 @@ app := intake.New(l)
 ```
 
 ### Request validation
-`Intake` provides a basic `UnmarshalJSON` function for validating requests
+`Intake` provides a basic `UnmarshalJSON` function for validating requests (github.com/go-playground/validator)
 ```go
 type sample struct {
 	Username string

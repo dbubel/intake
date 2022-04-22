@@ -1,7 +1,10 @@
 # Intake
-API framework written in Go. Intake uses `httprouter` under the hood. 
-Intake was written to be a simplistic 
-framework for writing API servers. 
+API framework written in Go. Intake uses `httprouter` (https://github.com/julienschmidt/httprouter) under the hood. 
+
+Intake was written to be a simplistic framework for writing API servers. It was designed to not hide whats going on 
+during the lifetime of a request. In the spirit of Go, verbosity was chosen as to make the code more readable. I 
+believe that with this approach APIs built using `Intake` will be more maintable and easily modified for the life of 
+the application.
 
 Sample server
 ```go

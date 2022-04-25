@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -54,7 +53,7 @@ func (a *Middleware) Recover(next intake.Handler) intake.Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		defer func() {
 			if err := recover(); err != nil {
-				intake.RespondError(w, r, fmt.Errorf("error panic"), http.StatusInternalServerError, "server recovered from a panic")
+				intake.RespondJSON(w, r, http.StatusInternalServerError, "server recovered from a panic")
 				a.logger.WithFields(logrus.Fields{"panic": err}).Error("recovered from panic")
 			}
 		}()
@@ -70,7 +69,7 @@ func (a *Middleware) RateLimit(n float64) func(handler intake.Handler) intake.Ha
 			requestsPerSecond := 1 / time.Now().Sub(lastRequestTime).Seconds()
 			lastRequestTime = time.Now()
 			if requestsPerSecond > n {
-				intake.RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
+				intake.RespondJSON(w, r, http.StatusTooManyRequests, "rate limited")
 				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond}).Warn("rate limited")
 				return
 			}
@@ -108,7 +107,7 @@ func (a *Middleware) RateLimitIP(n float64) func(handler intake.Handler) intake.
 
 			ipMap[requestIp] = time.Now()
 			if requestsPerSecond > n {
-				intake.RespondError(w, r, fmt.Errorf("too many requests"), http.StatusTooManyRequests, "rate limited")
+				intake.RespondJSON(w, r, http.StatusTooManyRequests, "rate limited")
 				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond, "ip": requestIp}).Warn("ip rate limited")
 				return
 			}

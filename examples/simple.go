@@ -69,9 +69,9 @@ func main() {
 
 	mw := Middleware{logger: apiLogger}
 
-	app.AddGlobal(mw.Logging)
-	app.AddGlobal(mw2)
-	app.AddGlobal(mw1)
+	app.AddGlobalMiddleware(mw.Logging)
+	app.AddGlobalMiddleware(mw2)
+	app.AddGlobalMiddleware(mw1)
 	app.AddEndpoints(eps)
 
 	app.Run(&http.Server{

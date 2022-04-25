@@ -1,7 +1,9 @@
 package intake
 
 import (
-	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,80 +13,223 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestApp_SimpleRoute(t *testing.T) {
-	var app = NewDefault()
+type testPayload struct {
+	Msg string `json:"msg"`
+}
+
+var payload = testPayload{Msg: "payload"}
+var l *logrus.Logger
+
+func init() {
+	l = logrus.New()
+	l.SetLevel(logrus.InfoLevel)
+}
+func TestIntake(t *testing.T) {
+	var app = New(l)
 
 	testHandler := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, map[string]interface{}{"msg": "payload"})
+		RespondJSON(w, r, http.StatusOK, payload)
 	}
 
 	app.AddEndpoint(http.MethodGet, "/test", testHandler)
 
-	r := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	app.Router.ServeHTTP(w, r)
+	t.Run("test simple route", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	resp, _ := ioutil.ReadAll(w.Body)
-	assert.JSONEq(t, `{"msg":"payload"}`, string(resp))
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp, err := ioutil.ReadAll(w.Body)
+		assert.NoError(t, err)
+
+		var res testPayload
+		assert.NoError(t, json.Unmarshal(resp, &res))
+		assert.Equal(t, "payload", res.Msg)
+	})
+
+	t.Run("test route not found", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/not-found", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
 }
 
-func TestApp_GlobalMiddleware(t *testing.T) {
+func TestIntakeMiddleware(t *testing.T) {
 	var app = NewDefault()
 	testHandler := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, map[string]interface{}{"message": r.Context().Value("shared")})
+		RespondJSON(w, r, http.StatusOK, payload)
 	}
-	app.AddGlobal(middlwareOne)
-	app.AddGlobal(middlewareTwo)
+	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+		var helloStr string
+		FromContext(r, "onCtx", &helloStr)
+		RespondJSON(w, r, http.StatusOK, helloStr)
+	}
+	testHandlerWithCtxTwo := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+		var helloStr string
+		FromContext(r, "onCtx", &helloStr)
 
-	app.AddEndpoint(http.MethodGet, "/test", testHandler)
-	app.AddEndpoint(http.MethodGet, "/testtwo", testHandler)
+		var helloStrTwo string
+		FromContext(r, "onCtxTwo", &helloStrTwo)
+		RespondJSON(w, r, http.StatusOK, fmt.Sprintf("%s %s", helloStr, helloStrTwo))
+	}
+	testMw := func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			next(w, r, params)
+		}
+	}
+	testMwWithCtx := func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			AddToContext(r, "onCtx", "hello world")
+			next(w, r, params)
+		}
+	}
+	testMwWithCtxTwo := func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			AddToContext(r, "onCtxTwo", "hello world two")
+			next(w, r, params)
+		}
+	}
 
-	r := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	r1 := httptest.NewRequest(http.MethodGet, "/testtwo", nil)
-	w1 := httptest.NewRecorder()
-	app.Router.ServeHTTP(w, r)
-	app.Router.ServeHTTP(w1, r1)
+	app.AddEndpoint(http.MethodGet, "/test-mw-simple", testHandler, testMw)
+	app.AddEndpoint(http.MethodGet, "/test-mw-simple-with-context", testHandlerWithCtx, testMwWithCtx)
+	app.AddEndpoint(http.MethodGet, "/test-mw-simple-with-context-two", testHandlerWithCtxTwo, testMwWithCtx, testMwWithCtxTwo)
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	resp, _ := ioutil.ReadAll(w.Body)
-	assert.JSONEq(t, `{"message":"valueonevaluetwo"}`, string(resp))
+	t.Run("test route with middleware", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
 
-	assert.Equal(t, http.StatusOK, w1.Code)
-	resp2, _ := ioutil.ReadAll(w1.Body)
-	assert.JSONEq(t, `{"message":"valueonevaluetwo"}`, string(resp2))
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("test route with middleware context", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp, err := ioutil.ReadAll(w.Body)
+		assert.NoError(t, err)
+
+		var res string
+		assert.NoError(t, json.Unmarshal(resp, &res))
+		assert.Equal(t, "hello world", res)
+	})
+
+	t.Run("test route with middleware with two contexts", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context-two", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp, err := ioutil.ReadAll(w.Body)
+		assert.NoError(t, err)
+
+		var res string
+		assert.NoError(t, json.Unmarshal(resp, &res))
+		assert.Equal(t, "hello world hello world two", res)
+	})
 }
 
-func TestApp_RouteMiddleware(t *testing.T) {
-	var app = NewDefault()
-	testHandler := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, map[string]interface{}{"message": r.Context().Value("shared")})
+func TestIntakeMiddlewareGroups(t *testing.T) {
+	var app = New(l)
+
+	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+		var helloStr string
+		FromContext(r, "onCtx", &helloStr)
+		RespondJSON(w, r, http.StatusOK, helloStr)
 	}
-	app.AddEndpoint(http.MethodGet, "/test", testHandler, middlwareOne)
 
-	r := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	app.Router.ServeHTTP(w, r)
+	testMwWithCtx := func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			AddToContext(r, "onCtx", "hello world")
+			next(w, r, params)
+		}
+	}
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	resp, _ := ioutil.ReadAll(w.Body)
-	assert.JSONEq(t, `{"message":"valueone"}`, string(resp))
+	eps := Endpoints{
+		GET("/test-one", testHandlerWithCtx),
+		GET("/test-two", testHandlerWithCtx),
+	}
+	eps.Use(testMwWithCtx)
+	app.AddEndpoints(eps)
+
+	t.Run("test route with middleware group", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test-one", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp, err := ioutil.ReadAll(w.Body)
+		assert.NoError(t, err)
+
+		var res string
+		assert.NoError(t, json.Unmarshal(resp, &res))
+		assert.Equal(t, "hello world", res)
+	})
+
+	t.Run("test route with middleware group second route", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test-two", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp, err := ioutil.ReadAll(w.Body)
+		assert.NoError(t, err)
+
+		var res string
+		assert.NoError(t, json.Unmarshal(resp, &res))
+		assert.Equal(t, "hello world", res)
+	})
 }
 
-func middlwareOne(next Handler) Handler {
-	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		ctx := context.WithValue(r.Context(), "globalone", "valueone")
-		ctx = context.WithValue(ctx, "shared", "valueone")
-		next(w, r.WithContext(ctx), params)
+func TestIntakeGlobalMiddleware(t *testing.T) {
+	var app = New(l)
+
+	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+		var helloStr string
+		FromContext(r, "onCtx", &helloStr)
+
+		var global string
+		FromContext(r, "global", &global)
+		RespondJSON(w, r, http.StatusOK, fmt.Sprintf("%s %s", helloStr, global))
 	}
-}
-func middlewareTwo(next Handler) Handler {
-	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		sharedValue := r.Context().Value("shared").(string)
-		sharedValue = sharedValue + "valuetwo"
-		ctx := context.WithValue(r.Context(), "globaltwo", "valuetwo")
-		ctx = context.WithValue(ctx, "shared", sharedValue)
-		next(w, r.WithContext(ctx), params)
+
+	testMwWithCtx := func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			AddToContext(r, "onCtx", "hello world")
+			next(w, r, params)
+		}
 	}
+
+	testMwGlobal := func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			AddToContext(r, "global", "global middleware")
+			next(w, r, params)
+		}
+	}
+	app.AddGlobalMiddleware(testMwGlobal)
+
+	eps := Endpoints{
+		GET("/test-one", testHandlerWithCtx),
+	}
+	eps.Use(testMwWithCtx)
+	app.AddEndpoints(eps)
+
+	t.Run("test route with middleware group", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/test-one", nil)
+		w := httptest.NewRecorder()
+		app.Router.ServeHTTP(w, r)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp, err := ioutil.ReadAll(w.Body)
+		assert.NoError(t, err)
+
+		var res string
+		assert.NoError(t, json.Unmarshal(resp, &res))
+		assert.Equal(t, "hello world global middleware", res)
+	})
+
 }

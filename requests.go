@@ -4,28 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-
-	"github.com/go-playground/validator"
 )
-
-func UnmarshalJSON(r io.Reader, v interface{}) error {
-	if err := json.NewDecoder(r).Decode(v); err != nil {
-		return err
-	}
-
-	if fve := validate.Struct(v); fve != nil {
-		for _, fe := range fve.(validator.ValidationErrors) {
-			return Invalid{
-				Fld:  fe.Field(),
-				Err:  fe.Tag(),
-				Kind: fe.Kind().String(),
-			}
-		}
-	}
-	return nil
-}
 
 func AddToContext(r *http.Request, key string, v interface{}) error {
 	encoded, err := json.Marshal(v)

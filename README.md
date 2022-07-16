@@ -65,7 +65,7 @@ endpoints.Use(someMiddleware)
 Global middleware is applied to ALL endpoints associated with the intake app. 
 ```go
 app := intake.NewDefault()
-app.GlobalMiddleware(someMiddleware)
+app.AddGlobalMiddleware(someMiddleware)
 ```
 
 ### Custom logger

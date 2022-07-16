@@ -2,15 +2,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/dbubel/intake"
+	"github.com/julienschmidt/httprouter"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/dbubel/intake"
-	"github.com/sirupsen/logrus"
-
-	"github.com/julienschmidt/httprouter"
 )
 
 type test struct {
@@ -27,11 +25,9 @@ func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 func mw1(next intake.Handler) intake.Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		fmt.Println("m1")
 		defer func() {
 			var s int
 			intake.FromContext(r, "response-code", &s)
-			fmt.Printf("mw1 leave [%d]\n", s)
 		}()
 		next(w, r, params)
 	}
@@ -39,12 +35,9 @@ func mw1(next intake.Handler) intake.Handler {
 
 func mw2(next intake.Handler) intake.Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		fmt.Println("m2")
 		defer func() {
-
 			var s int
 			intake.FromContext(r, "response-code", &s)
-			fmt.Printf("mw2 leave [%d]\n", s)
 		}()
 		next(w, r, params)
 	}
@@ -67,9 +60,9 @@ func main() {
 		intake.GET("/test-get", testSimple),
 	}
 
-	mw := Middleware{logger: apiLogger}
+	//mw := Middleware{logger: apiLogger}
 
-	app.AddGlobalMiddleware(mw.Logging)
+	//app.AddGlobalMiddleware(mw.Logging)
 	app.AddGlobalMiddleware(mw2)
 	app.AddGlobalMiddleware(mw1)
 	app.AddEndpoints(eps)

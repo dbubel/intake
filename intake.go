@@ -69,7 +69,7 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, mid
 func (a *Intake) Run(server *http.Server) {
 	serverErrors := make(chan error, 1)
 	osSignals := make(chan os.Signal, 1)
-	signal.Notify(osSignals, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(osSignals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		serverErrors <- server.ListenAndServe()
 	}()

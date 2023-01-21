@@ -49,6 +49,19 @@ func someMiddleware(next intake.Handler) intake.Handler {
 app.AddEndpoint(http.MethodGet,"/test-in-the-middle",finalHandler,someMiddleware)
 ```
 
+### Prepend and Append middleware
+If you have a group of middlewares and you want to add another at the start or end of the chain, use the functions below.
+This will not affect global middleware always being first in the function calls.
+```go
+app := intake.NewDefault()
+endpoints := intake.Endpoints{
+    intake.NewEndpoint(http.MethodGet,"/test-ep-one", testEndpointOne),
+    intake.NewEndpoint(http.MethodGet,"/test-ep-two", testEndpointTwo),
+}
+endpoints.Prepend(someMiddleware)
+endpoints.Append(someOtherMiddleware)
+```
+
 #### Middleware groups
 Middleware groups are groups of endpoints that a middleware handler is applied to. 
 The middleware is applied to ALL endpoints in the group. 

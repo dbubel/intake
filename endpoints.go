@@ -1,6 +1,6 @@
 package intake
 
-type Endpoints []endpoint
+type Endpoints []Endpoint
 
 // Use wraps a group of endpoints in middleware
 func (e Endpoints) Use(mid ...MiddleWare) {

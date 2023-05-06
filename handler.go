@@ -7,3 +7,5 @@ import (
 
 // Handler a compatible type for httprouter
 type Handler func(w http.ResponseWriter, r *http.Request, params httprouter.Params)
+
+type StreamingHandler func(a int) Handler

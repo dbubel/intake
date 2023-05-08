@@ -3,14 +3,13 @@ package intake
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/julienschmidt/httprouter"
-	"github.com/stretchr/testify/assert"
 )
 
 type testPayload struct {
@@ -24,6 +23,7 @@ func init() {
 	l = logrus.New()
 	l.SetLevel(logrus.InfoLevel)
 }
+
 func TestIntake(t *testing.T) {
 	var app = New(l)
 

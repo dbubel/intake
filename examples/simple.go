@@ -16,6 +16,16 @@ type test struct {
 	Addr string `validate:"required"`
 }
 
+func simpleStream(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	js := intake.NewStreamingJSONWriter(&w)
+	js.Write(map[string]string{
+		"hello": "test",
+	})
+	js.Write(map[string]string{
+		"hello": "world",
+	})
+}
+
 func testSimple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
 		"status": "OK",
@@ -58,6 +68,7 @@ func main() {
 	app := intake.New(apiLogger)
 	eps := intake.Endpoints{
 		intake.GET("/test-get", testSimple),
+		intake.GET("/stream", simpleStream),
 	}
 
 	//mw := Middleware{logger: apiLogger}

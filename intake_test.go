@@ -1,235 +1,330 @@
 package intake
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/julienschmidt/httprouter"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-type testPayload struct {
-	Msg string `json:"msg"`
-}
+func TestIntake_EndpointGroups(t *testing.T) {
+	intake := NewDefault()
 
-var payload = testPayload{Msg: "payload"}
-var l *logrus.Logger
-
-func init() {
-	l = logrus.New()
-	l.SetLevel(logrus.InfoLevel)
-}
-
-func TestIntake(t *testing.T) {
-	var app = New(l)
-
-	testHandler := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, payload)
+	grpOne := Endpoints{
+		GET("/get", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "GET()")
+		}),
+	}
+	grpTwo := Endpoints{
+		POST("/post", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "POST()")
+		}),
 	}
 
-	app.AddEndpoint(http.MethodGet, "/test", testHandler)
+	grpThree := Endpoints{
+		DELETE("/delete", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "DELETE()")
+		}),
+	}
+
+	intake.AddEndpoints(grpOne)
+	intake.AddEndpoints(grpTwo)
+	intake.AddEndpoints(grpThree)
+
+	server := httptest.NewServer(intake.Router)
+	defer server.Close()
+
+	tests := []struct {
+		name   string
+		resp   string
+		route  string
+		method string
+	}{
+		{
+			name:   "GET group",
+			resp:   "GET()",
+			route:  "/get",
+			method: http.MethodGet,
+		},
+		{
+			name:   "POST group",
+			resp:   "POST()",
+			route:  "/post",
+			method: http.MethodPost,
+		},
+		{
+			name:   "DELETE group",
+			resp:   "DELETE()",
+			route:  "/delete",
+			method: http.MethodDelete,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest(test.method, server.URL+test.route, nil)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Error(err)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if http.StatusOK != resp.StatusCode {
+				t.Error("incorrect status code", resp.StatusCode)
+			}
+
+			if test.resp != string(body) {
+				t.Error("incorrect response body", string(body), "expected", test.resp)
+			}
+		})
+	}
+}
+
+func TestIntake_HttpMethodWrappers(t *testing.T) {
+	intake := NewDefault()
+
+	eps := Endpoints{
+		GET("/get", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "GET()")
+		}),
+		POST("/post", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "POST()")
+		}),
+		PATCH("/patch", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "PATCH()")
+		}),
+		PUT("/put", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "PUT()")
+		}),
+		DELETE("/delete", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "DELETE()")
+		}),
+	}
+	intake.AddEndpoints(eps)
+
+	server := httptest.NewServer(intake.Router)
+	defer server.Close()
+
+	tests := []struct {
+		name   string
+		resp   string
+		route  string
+		method string
+	}{
+		{
+			name:   "GET wrapper",
+			resp:   "GET()",
+			route:  "/get",
+			method: http.MethodGet,
+		},
+		{
+			name:   "POST wrapper",
+			resp:   "POST()",
+			route:  "/post",
+			method: http.MethodPost,
+		},
+		{
+			name:   "PUT wrapper",
+			resp:   "PUT()",
+			route:  "/put",
+			method: http.MethodPut,
+		},
+		{
+			name:   "PATCH wrapper",
+			resp:   "PATCH()",
+			route:  "/patch",
+			method: http.MethodPatch,
+		},
+		{
+			name:   "DELETE wrapper",
+			resp:   "DELETE()",
+			route:  "/delete",
+			method: http.MethodDelete,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest(test.method, server.URL+test.route, nil)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Error(err)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if http.StatusOK != resp.StatusCode {
+				t.Error("incorrect status code", resp.StatusCode)
+			}
+
+			if test.resp != string(body) {
+				t.Error("incorrect response body", string(body), "expected", test.resp)
+			}
+		})
+	}
+}
+
+func TestIntake_Methods(t *testing.T) {
+	intake := NewDefault()
+
+	intake.AddEndpoint("/get", http.MethodGet, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "hello get")
+	})
+	intake.AddEndpoint("/post", http.MethodPost, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "hello post")
+	})
+	intake.AddEndpoint("/patch", http.MethodPatch, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "hello patch")
+	})
+	intake.AddEndpoint("/put", http.MethodPut, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "hello put")
+	})
+	intake.AddEndpoint("/delete", http.MethodDelete, func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "hello delete")
+	})
+
+	server := httptest.NewServer(intake.Router)
+	defer server.Close()
+
+	t.Run("test method get", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/get")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.NoError(t, err)
+		assert.Equal(t, "hello get", string(body))
+	})
+
+	//t.Run("test method post", func(t *testing.T) {
+	//
+	//	req, err := http.NewRequest(http.MethodPost,server.URL+"/post",nil)
+	//	assert.NoError(t, err)
+	//	resp,err:=http.DefaultClient.Do(req)
+	//	assert.NoError(t, err)
+	//	body, err := io.ReadAll(resp.Body)
+	//
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, "hello post", string(body))
+	//})
+	//
+	//t.Run("test method patch", func(t *testing.T) {
+	//
+	//	req, err := http.NewRequest(http.MethodPatch,server.URL+"/patch",nil)
+	//	assert.NoError(t, err)
+	//	resp,err:=http.DefaultClient.Do(req)
+	//	assert.NoError(t, err)
+	//	body, err := io.ReadAll(resp.Body)
+	//
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, "hello patch", string(body))
+	//})
+	//
+	//t.Run("test method put", func(t *testing.T) {
+	//	req, err := http.NewRequest(http.MethodPut,server.URL+"/put",nil)
+	//	assert.NoError(t, err)
+	//	resp,err:=http.DefaultClient.Do(req)
+	//	assert.NoError(t, err)
+	//	body, err := io.ReadAll(resp.Body)
+	//
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, "hello put", string(body))
+	//})
+	//
+	//t.Run("test method delete", func(t *testing.T) {
+	//	req, err := http.NewRequest(http.MethodPut,server.URL+"/delete",nil)
+	//	assert.NoError(t, err)
+	//	resp,err:=http.DefaultClient.Do(req)
+	//	assert.NoError(t, err)
+	//	body, err := io.ReadAll(resp.Body)
+	//
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, "hello delete", string(body))
+	//})
+}
+
+func TestIntake_AddEndpoint(t *testing.T) {
+	intake := NewDefault()
+	simpleHandler := func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Fprint(writer, "hello world")
+	}
+
+	simpleMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, "hello middleware ")
+			next(w, r)
+		}
+	}
+
+	thirdMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, "hello middleware three ")
+			next(w, r)
+		}
+	}
+
+	intake.AddEndpoint("/test", http.MethodGet, simpleHandler)
+	intake.AddEndpoint("/middleware-simple", http.MethodGet, simpleHandler, simpleMiddleware)
+	intake.AddEndpoint("/middleware-simple-three", http.MethodGet, simpleHandler, simpleMiddleware, thirdMiddleware)
+
+	server := httptest.NewServer(intake.Router)
+	defer server.Close()
 
 	t.Run("test simple route", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
 
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
+		resp, err := http.Get(server.URL + "/test")
+		body, err := io.ReadAll(resp.Body)
+
 		assert.NoError(t, err)
-
-		var res testPayload
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "payload", res.Msg)
-	})
-
-	t.Run("test route not found", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/not-found", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusNotFound, w.Code)
-	})
-}
-
-func TestIntakeMiddleware(t *testing.T) {
-	var app = NewDefault()
-	testHandler := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, payload)
-	}
-	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-		RespondJSON(w, r, http.StatusOK, helloStr)
-	}
-	testHandlerWithCtxTwo := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-
-		var helloStrTwo string
-		FromContext(r, "onCtxTwo", &helloStrTwo)
-		RespondJSON(w, r, http.StatusOK, fmt.Sprintf("%s %s", helloStr, helloStrTwo))
-	}
-	testMw := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			next(w, r, params)
-		}
-	}
-	testMwWithCtx := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtx", "hello world")
-			next(w, r, params)
-		}
-	}
-	testMwWithCtxTwo := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtxTwo", "hello world two")
-			next(w, r, params)
-		}
-	}
-
-	app.AddEndpoint(http.MethodGet, "/test-mw-simple", testHandler, testMw)
-	app.AddEndpoint(http.MethodGet, "/test-mw-simple-with-context", testHandlerWithCtx, testMwWithCtx)
-	app.AddEndpoint(http.MethodGet, "/test-mw-simple-with-context-two", testHandlerWithCtxTwo, testMwWithCtx, testMwWithCtxTwo)
-
-	t.Run("test route with middleware", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
-
-	t.Run("test route with middleware context", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world", res)
+		assert.Equal(t, "hello world", string(body))
 	})
 
-	t.Run("test route with middleware with two contexts", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context-two", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
+	t.Run("test a single simple middleware", func(t *testing.T) {
 
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
+		resp, err := http.Get(server.URL + "/middleware-simple")
+		body, err := io.ReadAll(resp.Body)
+
 		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world hello world two", res)
-	})
-}
-
-func TestIntakeMiddlewareGroups(t *testing.T) {
-	var app = New(l)
-
-	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-		RespondJSON(w, r, http.StatusOK, helloStr)
-	}
-
-	testMwWithCtx := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtx", "hello world")
-			next(w, r, params)
-		}
-	}
-
-	eps := Endpoints{
-		GET("/test-one", testHandlerWithCtx),
-		GET("/test-two", testHandlerWithCtx),
-	}
-	eps.Use(testMwWithCtx)
-	app.AddEndpoints(eps)
-
-	t.Run("test route with middleware group", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-one", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world", res)
+		assert.Equal(t, "hello middleware hello world", string(body))
 	})
 
-	t.Run("test route with middleware group second route", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-two", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
+	t.Run("test multiple simple middleware", func(t *testing.T) {
 
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
+		resp, err := http.Get(server.URL + "/middleware-simple-three")
+		body, err := io.ReadAll(resp.Body)
+
 		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world", res)
-	})
-}
-
-func TestIntakeGlobalMiddleware(t *testing.T) {
-	var app = New(l)
-
-	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-
-		var global string
-		FromContext(r, "global", &global)
-		RespondJSON(w, r, http.StatusOK, fmt.Sprintf("%s %s", helloStr, global))
-	}
-
-	testMwWithCtx := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtx", "hello world")
-			next(w, r, params)
-		}
-	}
-
-	testMwGlobal := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "global", "global middleware")
-			next(w, r, params)
-		}
-	}
-	app.AddGlobalMiddleware(testMwGlobal)
-
-	eps := Endpoints{
-		GET("/test-one", testHandlerWithCtx),
-	}
-	eps.Use(testMwWithCtx)
-	app.AddEndpoints(eps)
-
-	t.Run("test route with middleware group", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-one", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world global middleware", res)
+		assert.Equal(t, "hello middleware hello middleware three hello world", string(body))
 	})
-
 }

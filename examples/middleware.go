@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dbubel/intake"
-	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,52 +19,42 @@ type Middleware struct {
 	logger *logrus.Logger
 }
 
-func (a *Middleware) Logging(next intake.Handler) intake.Handler {
-	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Middleware) Logging(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
-		defer func() {
-			var code int
-			if err := intake.FromContext(r, "response-code", &code); err != nil {
-				a.logger.WithError(err).Error("error getting response code from context")
-			}
+		next(w, r)
 
-			var responseLength int
-			if err := intake.FromContext(r, "response-length", &responseLength); err != nil {
-				a.logger.WithError(err).Error("error getting response length from context")
-			}
+		var code int
+		if err := intake.FromContext(r, "response-code", &code); err != nil {
+			a.logger.WithError(err).Error("error getting response code from context")
+		}
 
-			a.logger.WithFields(logrus.Fields{
-				"method":           r.Method,
-				"requestUri":       r.RequestURI,
-				"contentLen":       r.ContentLength,
-				"responseLenBytes": responseLength,
-				"responseTimeMs":   time.Now().Sub(t).Milliseconds(),
-				"code":             code,
-			}).Info("handled request")
-		}()
-
-		next(w, r, params)
+		a.logger.WithFields(logrus.Fields{
+			"method":           r.Method,
+			"requestUri":       r.RequestURI,
+			"contentLen":       r.ContentLength,
+			"responseTimeMs":   time.Now().Sub(t).Milliseconds(),
+			"code":             code,
+		}).Info("handled request")
 	}
 }
 
 // Recover avoids the application panicing if any calls to the route cause one
-func (a *Middleware) Recover(next intake.Handler) intake.Handler {
-	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		defer func() {
-			if err := recover(); err != nil {
-				intake.RespondJSON(w, r, http.StatusInternalServerError, "server recovered from a panic")
-				a.logger.WithFields(logrus.Fields{"panic": err}).Error("recovered from panic")
-			}
-		}()
-		next(w, r, params)
+func (a *Middleware) Recover(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		next(w, r)
+		if err := recover(); err != nil {
+			intake.RespondJSON(w, r, http.StatusInternalServerError, "server recovered from a panic")
+			a.logger.WithFields(logrus.Fields{"panic": err}).Error("recovered from panic")
+		}
 	}
 }
 
 // RateLimit will limit requests that use this middleware to n requests per second
-func (a *Middleware) RateLimit(n float64) func(handler intake.Handler) intake.Handler {
+func (a *Middleware) RateLimit(n float64) func(handler http.HandlerFunc) http.HandlerFunc {
 	var lastRequestTime = time.Now()
-	return func(next intake.Handler) intake.Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
 			requestsPerSecond := 1 / time.Now().Sub(lastRequestTime).Seconds()
 			lastRequestTime = time.Now()
 			if requestsPerSecond > n {
@@ -73,13 +62,13 @@ func (a *Middleware) RateLimit(n float64) func(handler intake.Handler) intake.Ha
 				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond}).Warn("rate limited")
 				return
 			}
-			next(w, r, params)
+			next(w, r)
 		}
 	}
 }
 
 // RateLimitIP limit the number of requests per second per IP
-func (a *Middleware) RateLimitIP(n float64) func(handler intake.Handler) intake.Handler {
+func (a *Middleware) RateLimitIP(n float64) func(handler http.HandlerFunc) http.HandlerFunc {
 	var ipMap map[string]time.Time
 	ipMap = make(map[string]time.Time)
 
@@ -94,8 +83,8 @@ func (a *Middleware) RateLimitIP(n float64) func(handler intake.Handler) intake.
 
 		return "noip"
 	}
-	return func(next intake.Handler) intake.Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
 			var requestsPerSecond float64
 			requestIp := fn(r.RemoteAddr)
 			val, exists := ipMap[requestIp]
@@ -111,22 +100,22 @@ func (a *Middleware) RateLimitIP(n float64) func(handler intake.Handler) intake.
 				a.logger.WithFields(logrus.Fields{"requestsPerSecond": requestsPerSecond, "ip": requestIp}).Warn("ip rate limited")
 				return
 			}
-			next(w, r, params)
+			next(w, r)
 		}
 	}
 }
 
 // Timeout if added will created a context that will cancel after t. This cancel
 // will affect all downstream uses of the context
-func (a *Middleware) Timeout(t time.Duration) func(handler intake.Handler) intake.Handler {
-	return func(next intake.Handler) intake.Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Middleware) Timeout(t time.Duration) func(handler http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
 			// Create a context that is both manually cancellable and will signal
 			// cancel at the specified duration.
 			ctx, cancel := context.WithTimeout(r.Context(), t)
-			defer cancel()
 			*r = *r.WithContext(ctx)
-			next(w, r, params)
+			next(w, r)
+			cancel()
 		}
 	}
 }

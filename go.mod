@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator v9.31.0+incompatible
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0

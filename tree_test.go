@@ -11,6 +11,6 @@ func TestNewTree(t *testing.T) {
 	nn.Insert("/api", "get", func(writer http.ResponseWriter, request *http.Request) {})
 
 
-	nn.PrintTree("",true)
+	//nn.PrintTree("",true)
 	//fmt.Println(nn.children, nn.value, nn.handlers)
 }

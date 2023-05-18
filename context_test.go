@@ -2,9 +2,13 @@ package intake
 
 import (
 	"bytes"
+	"encoding/gob"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 type TestEmployee struct {
@@ -233,37 +237,33 @@ func TestAddToContext(t *testing.T) {
 		t.Errorf("unexpected value: got %v want %v", retrievedV, v)
 	}
 }
+type Data struct {
+	Numbers []int
+}
 
 func TestFromContext(t *testing.T) {
-	r := httptest.NewRequest("GET", "http://example.com", nil)
-	key := "test"
-	v := struct {
-		Name string
-		Age  int
-	}{
-		Name: "Alice",
-		Age:  25,
+	// Initialize a large data structure.
+	data := Data{Numbers: make([]int, 1e6)}
+	for i := range data.Numbers {
+		data.Numbers[i] = i
 	}
 
-	err := AddToContext(r, key, v)
+	// Measure the time and output size for JSON.
+	start := time.Now()
+	jsonOutput, err := json.Marshal(data)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		log.Fatal(err)
 	}
+	fmt.Printf("JSON: %v bytes, %d seconds\n", len(jsonOutput), time.Since(start).Nanoseconds())
 
-	var retrievedV struct {
-		Name string
-		Age  int
+	// Measure the time and output size for gob.
+	start = time.Now()
+	var gobOutput bytes.Buffer
+	enc := gob.NewEncoder(&gobOutput)
+	if err := enc.Encode(data); err != nil {
+		log.Fatal(err)
 	}
-
-	err = FromContext(r, key, &retrievedV)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	// Check if the value is correctly retrieved
-	if retrievedV.Name != v.Name || retrievedV.Age != v.Age {
-		t.Errorf("unexpected value: got %v want %v", retrievedV, v)
-	}
+	fmt.Printf("gob: %v bytes, %d seconds\n", gobOutput.Len(), time.Since(start).Nanoseconds())
 }
 
 

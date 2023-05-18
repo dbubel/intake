@@ -6,6 +6,16 @@ import (
 	"net/http"
 )
 
+func RespondJSONEncode(w http.ResponseWriter, r *http.Request, code int, data interface{}) error {
+	if err := AddToContext(r, "response-code", code); err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	return json.NewEncoder(w).Encode(data)
+}
+
 func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) (int, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {

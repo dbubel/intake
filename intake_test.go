@@ -21,7 +21,6 @@ func TestIntake_EndpointGroups(t *testing.T) {
 			fmt.Fprint(writer, "POST()")
 		}),
 	}
-
 	grpThree := Endpoints{
 		DELETE("/delete", func(writer http.ResponseWriter, request *http.Request) {
 			fmt.Fprint(writer, "DELETE()")

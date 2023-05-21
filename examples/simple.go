@@ -1,88 +1,87 @@
 package main
 
-//
-//import (
-//	"fmt"
-//	"github.com/dbubel/intake"
-//	"github.com/sirupsen/logrus"
-//	"net/http"
-//	"runtime"
-//	"strings"
-//	"time"
-//)
-//
-//type test struct {
-//	Name string `validate:"required"`
-//	Addr string `validate:"required"`
-//}
-//
-//func simpleStream(w http.ResponseWriter, r *http.Request) {
-//	js := intake.NewStreamingJSONWriter(&w)
-//	js.Write(map[string]string{
-//		"hello": "test",
-//	})
-//	js.Write(map[string]string{
-//		"hello": "world",
-//	})
-//}
-//
-//func testSimple(w http.ResponseWriter, r *http.Request) {
-//	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
-//		"status": "OK",
-//	})
-//	return
-//}
-//
-//func mw1(next http.HandlerFunc) http.HandlerFunc {
-//	return func(w http.ResponseWriter, r *http.Request) {
-//		defer func() {
-//			var s int
-//			intake.FromContext(r, "response-code", &s)
-//		}()
-//		next(w, r)
-//	}
-//}
-//
-//func mw2(next http.HandlerFunc) http.HandlerFunc {
-//	return func(w http.ResponseWriter, r *http.Request) {
-//		defer func() {
-//			var s int
-//			intake.FromContext(r, "response-code", &s)
-//		}()
-//		next(w, r)
-//	}
-//}
-//
-//func main() {
-//
-//	apiLogger := logrus.New()
-//	apiLogger.SetLevel(logrus.DebugLevel)
-//	apiLogger.SetReportCaller(true)
-//	apiLogger.SetFormatter(&logrus.JSONFormatter{
-//		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-//			s := strings.Split(f.File, "/")[len(strings.Split(f.File, "/"))-1]
-//			return "", fmt.Sprintf("%s:%d", s, f.Line)
-//		},
-//	})
-//
-//	app := intake.New(apiLogger)
-//	eps := intake.Endpoints{
-//		intake.GET("/test-get", testSimple),
-//		intake.GET("/stream", simpleStream),
-//	}
-//
-//	//mw := Middleware{logger: apiLogger}
-//
-//	//app.AddGlobalMiddleware(mw.Logging)
-//	app.AddGlobalMiddleware(mw2)
-//	app.AddGlobalMiddleware(mw1)
-//	app.AddEndpoints(eps)
-//
-//	app.Run(&http.Server{
-//		Addr:           ":8000",
-//		Handler:        app.Router,
-//		ReadTimeout:    time.Second * 30,
-//		WriteTimeout:   time.Second * 30,
-//		MaxHeaderBytes: 1 << 20,
-//	})
-//}
+import (
+	"fmt"
+	"github.com/dbubel/intake"
+	"net/http"
+	"time"
+)
+
+type test struct {
+	Name string `validate:"required"`
+	Addr string `validate:"required"`
+}
+
+func simpleStream(w http.ResponseWriter, r *http.Request) {
+	js := intake.NewStreamingJSONWriter(&w)
+	js.Write(map[string]string{
+		"hello": "test",
+	})
+	js.Write(map[string]string{
+		"hello": "world",
+	})
+}
+
+func testSimple(w http.ResponseWriter, r *http.Request) {
+	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
+		"status": "OK",
+	})
+	return
+}
+
+func mw1(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			var s int
+			intake.FromContext(r, "response-code", &s)
+		}()
+		next(w, r)
+	}
+}
+
+func mw2(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			var s int
+			intake.FromContext(r, "response-code", &s)
+		}()
+		next(w, r)
+	}
+}
+
+func main() {
+
+	//apiLogger := logrus.New()
+	//apiLogger.SetLevel(logrus.DebugLevel)
+	//apiLogger.SetReportCaller(true)
+	//apiLogger.SetFormatter(&logrus.JSONFormatter{
+	//	CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+	//		s := strings.Split(f.File, "/")[len(strings.Split(f.File, "/"))-1]
+	//		return "", fmt.Sprintf("%s:%d", s, f.Line)
+	//	},
+	//})
+
+	app := intake.NewDefault()
+	//eps := intake.Endpoints{
+	//	intake.GET("/test-get", testSimple),
+	//	intake.GET("/stream", simpleStream),
+	//}
+
+	//mw := Middleware{logger: apiLogger}
+
+	//app.AddGlobalMiddleware(mw.Logging)
+	//app.AddGlobalMiddleware(mw2)
+	//app.AddGlobalMiddleware(mw1)
+	//app.AddEndpoints(eps)
+	app.AddEndpoint("/hello", http.MethodGet, testSimple)
+
+	fmt.Println("app router", app.Router)
+
+	app.Run(&http.Server{
+		Addr:           ":8000",
+		Handler:        app.Router,
+		ReadTimeout:    time.Second * 30,
+		WriteTimeout:   time.Second * 30,
+		MaxHeaderBytes: 1 << 20,
+	})
+}

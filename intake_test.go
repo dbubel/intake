@@ -2,7 +2,6 @@ package intake
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -208,9 +207,16 @@ func TestIntake_Methods(t *testing.T) {
 			return
 		}
 
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "hello get", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+		if err != nil {
+			t.Error(err)
+		}
+
+		if "hello get" != string(body) {
+			t.Errorf("body != 'hello get' %s", string(body))
+		}
 	})
 
 	//t.Run("test method post", func(t *testing.T) {
@@ -296,14 +302,20 @@ func TestIntake_AddEndpoint(t *testing.T) {
 	defer server.Close()
 
 	t.Run("test simple route", func(t *testing.T) {
-
 		resp, err := http.Get(server.URL + "/test")
 		body, err := io.ReadAll(resp.Body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "hello world", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if "hello world" != string(body) {
+			t.Errorf("body != 'hello world' %s", string(body))
+		}
 	})
 
 	t.Run("test a single simple middleware", func(t *testing.T) {
@@ -311,10 +323,17 @@ func TestIntake_AddEndpoint(t *testing.T) {
 		resp, err := http.Get(server.URL + "/middleware-simple")
 		body, err := io.ReadAll(resp.Body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "hello middleware hello world", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if "hello middleware hello world" != string(body) {
+			t.Errorf("body != 'hello middleware hello world' %s", string(body))
+		}
 	})
 
 	t.Run("test multiple simple middleware", func(t *testing.T) {
@@ -322,9 +341,16 @@ func TestIntake_AddEndpoint(t *testing.T) {
 		resp, err := http.Get(server.URL + "/middleware-simple-three")
 		body, err := io.ReadAll(resp.Body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "hello middleware hello middleware three hello world", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		if "hello middleware hello middleware three hello world" != string(body) {
+			t.Errorf("body != 'hello middleware hello middleware three hello world' %s", string(body))
+		}
 	})
 }

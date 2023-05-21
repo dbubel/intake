@@ -77,4 +77,3 @@ func (n *Node) PrintTree(prefix string, last bool) {
 		n.children[r].PrintTree(childPrefix, i == len(childValues)-1)
 	}
 }
-

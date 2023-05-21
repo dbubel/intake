@@ -2,7 +2,6 @@ package intake
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,11 +34,20 @@ func TestRouter(t *testing.T) {
 		defer server.Close()
 		resp, err := http.Get(server.URL + "/hello")
 		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "Hello!", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		correctResp := "Hello!"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+		}
 	})
 
 	t.Run("test world route", func(t *testing.T) {
@@ -47,11 +55,20 @@ func TestRouter(t *testing.T) {
 		defer server.Close()
 		resp, err := http.Get(server.URL + "/world")
 		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "World!", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		correctResp := "World!"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+		}
 	})
 
 	t.Run("test api/foo route", func(t *testing.T) {
@@ -59,11 +76,20 @@ func TestRouter(t *testing.T) {
 		defer server.Close()
 		resp, err := http.Get(server.URL + "/api/v1/foo")
 		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "foo", string(body))
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		correctResp := "foo"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+		}
 	})
 
 	t.Run("test 404 not found", func(t *testing.T) {
@@ -71,10 +97,19 @@ func TestRouter(t *testing.T) {
 		defer server.Close()
 		resp, err := http.Get(server.URL + "/api/v1/does_not_exist")
 		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
 
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-		assert.NoError(t, err)
-		assert.Equal(t, "404 page not found\n", string(body))
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		correctResp := "404 page not found\n"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+		}
 	})
 }

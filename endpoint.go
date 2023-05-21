@@ -1,6 +1,5 @@
 package intake
 
-
 import "net/http"
 
 type MiddleWare func(http.HandlerFunc) http.HandlerFunc
@@ -43,5 +42,3 @@ func PATCH(path string, endpointHandler http.HandlerFunc, mid ...MiddleWare) End
 func HEAD(path string, endpointHandler http.HandlerFunc, mid ...MiddleWare) Endpoint {
 	return NewEndpoint(http.MethodHead, path, endpointHandler, mid...)
 }
-
-

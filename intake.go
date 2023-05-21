@@ -16,7 +16,7 @@ type Intake struct {
 
 func NewDefault() *Intake {
 	return &Intake{
-		Router: NewRouter(),
+		Router:           NewRouter(),
 		GlobalMiddleware: make([]MiddleWare, 0, 0),
 	}
 }
@@ -29,11 +29,10 @@ func (a *Intake) AddGlobalMiddleware(mw MiddleWare) {
 func (a *Intake) AddEndpoints(e ...Endpoints) {
 	for x := 0; x < len(e); x++ {
 		for i := 0; i < len(e[x]); i++ {
-			a.AddEndpoint( e[x][i].Path, e[x][i].Verb,e[x][i].EndpointHandler, e[x][i].MiddlewareHandlers...)
+			a.AddEndpoint(e[x][i].Path, e[x][i].Verb, e[x][i].EndpointHandler, e[x][i].MiddlewareHandlers...)
 		}
 	}
 }
-
 
 func (a *Intake) AddEndpoint(path string, verb string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
 	// Prepend the global middlewares to the route specific middleware
@@ -46,7 +45,7 @@ func (a *Intake) AddEndpoint(path string, verb string, finalHandler http.Handler
 	}
 
 	// Our wrapped function chain in a compatible httprouter AddEndpoint func
-	a.Router.AddRoute(path, verb,finalHandler)
+	a.Router.AddRoute(path, verb, finalHandler)
 	//a.Logger.WithFields(logrus.Fields{"verb": verb, "path": path}).Debug("added route")
 }
 
@@ -63,7 +62,7 @@ func (a *Intake) Run(server *http.Server) {
 	// Blocking main and waiting for shutdown.
 	select {
 	case err := <-serverErrors:
-		_=err
+		_ = err
 		//a.Logger.WithError(err).Error("error starting server")
 	case <-osSignals:
 		//a.Logger.Info("shutdown received shedding connections...")

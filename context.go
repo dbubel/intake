@@ -64,9 +64,9 @@ import (
 //	return  nil
 //}
 
-func AddToContextV2(r *http.Request, key string, v interface{}) error{
+func AddToContextV2(r *http.Request, key string, v interface{}) error {
 	var buf bytes.Buffer
-	if err:=json.NewEncoder(&buf).Encode(v);err != nil {
+	if err := json.NewEncoder(&buf).Encode(v); err != nil {
 		return err
 	}
 	*r = *r.WithContext(context.WithValue(r.Context(), key, &buf))
@@ -80,8 +80,6 @@ func FromContextV2(r *http.Request, key string, v interface{}) error {
 	}
 	return json.NewDecoder(data).Decode(v)
 }
-
-
 
 func AddToContext(r *http.Request, key string, v interface{}) error {
 	encoded, err := json.Marshal(v)
@@ -102,8 +100,6 @@ func FromContext(r *http.Request, key string, v interface{}) error {
 	}
 	return nil
 }
-
-
 
 //
 //func encodeJson(v interface{}) (*bytes.Buffer, error) {

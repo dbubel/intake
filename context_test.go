@@ -16,6 +16,7 @@ type TestEmployee struct {
 	Name   string
 	Salary int
 }
+
 //
 //
 //// TestEncodeGob tests the encodeGob function
@@ -147,8 +148,6 @@ type TestEmployee struct {
 //	}
 //}
 
-
-
 // Benchmarks
 func BenchmarkAddToContext(b *testing.B) {
 	r := httptest.NewRequest("GET", "http://example.com", nil)
@@ -200,7 +199,6 @@ func BenchmarkFromContext(b *testing.B) {
 	}
 }
 
-
 // Tests
 func TestAddToContext(t *testing.T) {
 	r := httptest.NewRequest("GET", "http://example.com", nil)
@@ -237,6 +235,7 @@ func TestAddToContext(t *testing.T) {
 		t.Errorf("unexpected value: got %v want %v", retrievedV, v)
 	}
 }
+
 type Data struct {
 	Numbers []int
 }
@@ -265,8 +264,6 @@ func TestFromContext(t *testing.T) {
 	}
 	fmt.Printf("gob: %v bytes, %d seconds\n", gobOutput.Len(), time.Since(start).Nanoseconds())
 }
-
-
 
 // Tests
 func TestAddToContextV2(t *testing.T) {
@@ -336,8 +333,6 @@ func TestFromContextV2(t *testing.T) {
 		t.Errorf("unexpected value: got %v want %v", retrievedV, v)
 	}
 }
-
-
 
 // Benchmarks
 func BenchmarkAddToContextV2(b *testing.B) {

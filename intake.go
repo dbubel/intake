@@ -15,7 +15,7 @@ type Intake struct {
 	GlobalMiddleware []MiddleWare
 }
 
-func NewDefault() *Intake {
+func New() *Intake {
 	return &Intake{
 		Router:           NewRouter(),
 		GlobalMiddleware: make([]MiddleWare, 0, 0),

@@ -28,16 +28,6 @@ func RespondGOB(w http.ResponseWriter, r *http.Request, code int, data interface
 }
 
 func Respond(w http.ResponseWriter, r *http.Request, code int, data []byte) (int, error) {
-	err := AddToContext(r, "response-code", code)
-	if err != nil {
-		return -1, err
-	}
-
-	err = AddToContext(r, "response-length", len(data))
-	if err != nil {
-		return -1, err
-	}
-
 	// content type is not set so attempt to set it
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", http.DetectContentType(data))

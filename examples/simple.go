@@ -1,18 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"github.com/dbubel/intake"
 	"net/http"
 	"time"
 )
 
-type test struct {
-	Name string `validate:"required"`
-	Addr string `validate:"required"`
-}
-
-func simpleStream(w http.ResponseWriter, r *http.Request) {
+func stream(w http.ResponseWriter, r *http.Request) {
 	js := intake.NewStreamingJSONWriter(&w)
 	js.Write(map[string]string{
 		"hello": "test",
@@ -24,12 +18,12 @@ func simpleStream(w http.ResponseWriter, r *http.Request) {
 
 func testSimple(w http.ResponseWriter, r *http.Request) {
 	intake.RespondJSON(w, r, http.StatusOK, map[string]string{
-		"status": "OK",
+		"status": "world",
 	})
 	return
 }
 
-func mw1(next http.HandlerFunc) http.HandlerFunc {
+func middlewareOne(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			var s int
@@ -39,7 +33,7 @@ func mw1(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func mw2(next http.HandlerFunc) http.HandlerFunc {
+func middlewareTwo(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			var s int
@@ -51,31 +45,9 @@ func mw2(next http.HandlerFunc) http.HandlerFunc {
 
 func main() {
 
-	//apiLogger := logrus.New()
-	//apiLogger.SetLevel(logrus.DebugLevel)
-	//apiLogger.SetReportCaller(true)
-	//apiLogger.SetFormatter(&logrus.JSONFormatter{
-	//	CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-	//		s := strings.Split(f.File, "/")[len(strings.Split(f.File, "/"))-1]
-	//		return "", fmt.Sprintf("%s:%d", s, f.Line)
-	//	},
-	//})
+	app := intake.New()
 
-	app := intake.NewDefault()
-	//eps := intake.Endpoints{
-	//	intake.GET("/test-get", testSimple),
-	//	intake.GET("/stream", simpleStream),
-	//}
-
-	//mw := Middleware{logger: apiLogger}
-
-	//app.AddGlobalMiddleware(mw.Logging)
-	//app.AddGlobalMiddleware(mw2)
-	//app.AddGlobalMiddleware(mw1)
-	//app.AddEndpoints(eps)
 	app.AddEndpoint("/hello", http.MethodGet, testSimple)
-
-	fmt.Println("app router", app.Router)
 
 	app.Run(&http.Server{
 		Addr:           ":8000",

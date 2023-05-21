@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -112,4 +113,104 @@ func TestRouter(t *testing.T) {
 			t.Errorf("[%s] != [%s]", correctResp, respBody)
 		}
 	})
+
+	t.Run("test 301 redirect trailing slash no follow", func(t *testing.T) {
+		server := httptest.NewServer(router)
+		defer server.Close()
+		client := &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+
+		resp, err := client.Get(server.URL + "/hello/")
+		if resp.StatusCode != http.StatusMovedPermanently {
+			t.Errorf("status code != 301 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	t.Run("test follow redirect with slash", func(t *testing.T) {
+		server := httptest.NewServer(router)
+		defer server.Close()
+		resp, err := http.Get(server.URL + "/hello/")
+		body, err := io.ReadAll(resp.Body)
+
+		respBody := string(body)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("status code != 200 [%d]", resp.StatusCode)
+		}
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		correctResp := "Hello!"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+		}
+	})
+}
+
+func TestAddRoute(t *testing.T) {
+	router := NewRouter()
+	route := "/test"
+	method := http.MethodGet
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {}
+	router.AddRoute(route, method, handler)
+
+	// Assert that the route was added to the router
+	if _, found := router.routes[method+strings.TrimSuffix(route, "/")]; !found {
+		t.Errorf("Route was not added to the router")
+	}
+}
+
+func TestServeHTTP(t *testing.T) {
+	router := NewRouter()
+	route := "/test"
+	method := http.MethodGet
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+	router.AddRoute(route, method, handler)
+
+	req, err := http.NewRequest(method, route, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler = router.routes[method+route]
+
+	handler(rr, req)
+
+	// Check the status code is what we expect.
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+}
+
+func TestRedirectTrailingSlash(t *testing.T) {
+	router := NewRouter()
+
+	req, err := http.NewRequest(http.MethodGet, "/test/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	redirect := router.RedirectTrailingSlash(rr, req)
+
+	// Check the status code is what we expect.
+	if status := rr.Code; status != http.StatusMovedPermanently {
+		t.Errorf("RedirectTrailingSlash returned wrong status code: got %v want %v", status, http.StatusMovedPermanently)
+	}
+
+	if !redirect {
+		t.Errorf("Expected a redirect but did not get one")
+	}
 }

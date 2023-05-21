@@ -9,7 +9,7 @@ import (
 )
 
 func TestIntake_EndpointGroups(t *testing.T) {
-	intake := NewDefault()
+	intake := New()
 
 	grpOne := Endpoints{
 		GET("/get", func(writer http.ResponseWriter, request *http.Request) {
@@ -85,7 +85,7 @@ func TestIntake_EndpointGroups(t *testing.T) {
 }
 
 func TestIntake_HttpMethodWrappers(t *testing.T) {
-	intake := NewDefault()
+	intake := New()
 
 	eps := Endpoints{
 		GET("/get", func(writer http.ResponseWriter, request *http.Request) {
@@ -172,7 +172,7 @@ func TestIntake_HttpMethodWrappers(t *testing.T) {
 }
 
 func TestIntake_Methods(t *testing.T) {
-	intake := NewDefault()
+	intake := New()
 
 	intake.AddEndpoint("/get", http.MethodGet, func(writer http.ResponseWriter, request *http.Request) {
 		fmt.Fprint(writer, "hello get")
@@ -218,63 +218,134 @@ func TestIntake_Methods(t *testing.T) {
 		}
 	})
 
-	//t.Run("test method post", func(t *testing.T) {
-	//
-	//	req, err := http.NewRequest(http.MethodPost,server.URL+"/post",nil)
-	//	assert.NoError(t, err)
-	//	resp,err:=http.DefaultClient.Do(req)
-	//	assert.NoError(t, err)
-	//	body, err := io.ReadAll(resp.Body)
-	//
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, "hello post", string(body))
-	//})
-	//
-	//t.Run("test method patch", func(t *testing.T) {
-	//
-	//	req, err := http.NewRequest(http.MethodPatch,server.URL+"/patch",nil)
-	//	assert.NoError(t, err)
-	//	resp,err:=http.DefaultClient.Do(req)
-	//	assert.NoError(t, err)
-	//	body, err := io.ReadAll(resp.Body)
-	//
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, "hello patch", string(body))
-	//})
-	//
-	//t.Run("test method put", func(t *testing.T) {
-	//	req, err := http.NewRequest(http.MethodPut,server.URL+"/put",nil)
-	//	assert.NoError(t, err)
-	//	resp,err:=http.DefaultClient.Do(req)
-	//	assert.NoError(t, err)
-	//	body, err := io.ReadAll(resp.Body)
-	//
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, "hello put", string(body))
-	//})
-	//
-	//t.Run("test method delete", func(t *testing.T) {
-	//	req, err := http.NewRequest(http.MethodPut,server.URL+"/delete",nil)
-	//	assert.NoError(t, err)
-	//	resp,err:=http.DefaultClient.Do(req)
-	//	assert.NoError(t, err)
-	//	body, err := io.ReadAll(resp.Body)
-	//
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	//	assert.NoError(t, err)
-	//	assert.Equal(t, "hello delete", string(body))
-	//})
+	t.Run("test method post", func(t *testing.T) {
+
+		req, err := http.NewRequest(http.MethodPost, server.URL+"/post", nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			t.Error(err)
+			return
+		}
+		correctResp := "hello post"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+			return
+		}
+	})
+
+	t.Run("test method patch", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPatch, server.URL+"/patch", nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			t.Error(err)
+			return
+		}
+		correctResp := "hello patch"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+			return
+		}
+	})
+
+	t.Run("test method put", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPut, server.URL+"/put", nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			t.Error(err)
+			return
+		}
+		correctResp := "hello put"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+			return
+		}
+	})
+
+	t.Run("test method delete", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodDelete, server.URL+"/delete", nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		respBody := string(body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			t.Error(err)
+			return
+		}
+		correctResp := "hello delete"
+		if correctResp != respBody {
+			t.Errorf("[%s] != [%s]", correctResp, respBody)
+			return
+		}
+	})
 }
 
 func TestIntake_AddEndpoint(t *testing.T) {
-	intake := NewDefault()
+	intake := New()
 	simpleHandler := func(writer http.ResponseWriter, request *http.Request) {
 		fmt.Fprint(writer, "hello world")
 	}

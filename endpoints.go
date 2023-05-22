@@ -1,6 +1,6 @@
 package intake
 
-type Endpoints []Endpoint
+type Endpoints []*Endpoint
 
 // Use wraps a group of endpoints in middleware
 func (e Endpoints) Use(mid ...MiddleWare) {
@@ -21,5 +21,11 @@ func (e Endpoints) Prepend(mid ...MiddleWare) {
 	mw = append(mw, mid...)
 	for i := 0; i < len(e); i++ {
 		e[i].MiddlewareHandlers = append(mw, e[i].MiddlewareHandlers...)
+	}
+}
+
+func (e Endpoints) Prefix(prefix string) {
+	for i := 0; i < len(e); i++ {
+		e[i].Prefix(prefix)
 	}
 }

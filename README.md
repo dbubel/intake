@@ -8,21 +8,20 @@ the application.
 
 Sample server
 ```go
-func simple(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	intake.Respond(w, r, http.StatusOK, []byte("testing get"))
-	return
-}
-
 func main() {
-	app := intake.NewDefault()
-	app.AddEndpoint(http.MethodGet,"/test-get", simple)
-	app.Run(&http.Server{
-		Addr:           ":8000",
-		Handler:        app.Router,
-		ReadTimeout:    time.Second * 10,
-		WriteTimeout:   time.Second * 10,
-		MaxHeaderBytes: 1 << 20,
-	})
+    app := intake.New()
+    
+    app.AddEndpoint("/hello", http.MethodGet, func(w http.ResponseWriter, t *http.Request) {
+        fmt.Fprint(w,"hello, world")
+    })
+    
+    app.Run(&http.Server{
+        Addr:           ":8000",
+        Handler:        app.Router,
+        ReadTimeout:    time.Second * 30,
+        WriteTimeout:   time.Second * 30,
+        MaxHeaderBytes: 1 << 20,
+    })
 }
 ```
 
@@ -40,7 +39,7 @@ app.AddEndpoints(endpoints)
 Middleware is executed before the final endpoint handler in the order they are added.
 ```go
 func someMiddleware(next intake.Handler) intake.Handler {
-    return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+    return func(w http.ResponseWriter, r *http.Request) {
         // do some block of logic needed for downstream handlers
         ctx := context.WithValue(r.Context(), "key", "value")
         next(w, r.WithContext(ctx), params)

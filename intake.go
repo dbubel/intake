@@ -13,8 +13,10 @@ import (
 type Intake struct {
 	Router           *Router
 	GlobalMiddleware []MiddleWare
+	OptionsHandler   http.HandlerFunc
 }
 
+// New Create a new intake application
 func New() *Intake {
 	return &Intake{
 		Router:           NewRouter(),
@@ -51,8 +53,10 @@ func (a *Intake) AddEndpoint(path string, verb string, finalHandler http.Handler
 
 	// Our wrapped function chain in a compatible httprouter AddEndpoint func
 	a.Router.AddRoute(path, verb, finalHandler)
-	log.Println("verb", verb, "path", path)
-	//a.Logger.WithFields(logrus.Fields{"verb": verb, "path": path}).Debug("added route")
+	if a.OptionsHandler != nil {
+		a.Router.AddRoute(path, verb, finalHandler)
+	}
+	log.Println("added route", verb, path)
 }
 
 // Run starts the http server. Waits for a signal to gracefully shutdown.
@@ -64,28 +68,22 @@ func (a *Intake) Run(server *http.Server) {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	//a.Logger.WithFields(logrus.Fields{"addr": server.Addr}).Info("server starting")
+	log.Println("server started on port", server.Addr)
 
 	// Blocking main and waiting for shutdown.
 	select {
 	case err := <-serverErrors:
-		_ = err
-		log.Println(err.Error(), "error starting server")
-		//a.Logger.WithError(err).Error("error starting server")
+		log.Println("error starting server", err.Error())
 	case <-osSignals:
 		log.Println("shutdown received shedding connections...")
-		//a.Logger.Info("shutdown received shedding connections...")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			log.Println("graceful shutdown did not complete in allowed time")
-			//a.Logger.WithError(err).Error("graceful shutdown did not complete in allowed time")
+			log.Println("graceful shutdown did not complete in allowed time", err.Error())
 			if err := server.Close(); err != nil {
-				log.Println("could not stop http server")
-				//a.Logger.WithError(err).Error("could not stop http server")
+				log.Println("could not stop http server", err.Error())
 			}
 		}
 		log.Println("shutdown OK")
-		//a.Logger.Info("shutdown OK")
 	}
 }

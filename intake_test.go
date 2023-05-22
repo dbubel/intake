@@ -26,10 +26,17 @@ func TestIntake_EndpointGroups(t *testing.T) {
 			fmt.Fprint(writer, "DELETE()")
 		}),
 	}
+	grpFour := Endpoints{
+		GET("/prefix", func(writer http.ResponseWriter, request *http.Request) {
+			fmt.Fprint(writer, "PREFIX()")
+		}),
+	}
+	grpFour.Prefix("/api/v1")
 
 	intake.AddEndpoints(grpOne)
 	intake.AddEndpoints(grpTwo)
 	intake.AddEndpoints(grpThree)
+	intake.AddEndpoints(grpFour)
 
 	server := httptest.NewServer(intake.Router)
 	defer server.Close()
@@ -57,6 +64,12 @@ func TestIntake_EndpointGroups(t *testing.T) {
 			resp:   "DELETE()",
 			route:  "/delete",
 			method: http.MethodDelete,
+		},
+		{
+			name:   "PREFIX group",
+			resp:   "PREFIX()",
+			route:  "/api/v1/prefix",
+			method: http.MethodGet,
 		},
 	}
 

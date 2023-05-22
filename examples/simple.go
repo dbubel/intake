@@ -1,9 +1,11 @@
 package main
 
 import (
-	"github.com/dbubel/intake"
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/dbubel/intake"
 )
 
 func stream(w http.ResponseWriter, r *http.Request) {
@@ -44,10 +46,11 @@ func middlewareTwo(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func main() {
-
 	app := intake.New()
 
-	app.AddEndpoint("/hello", http.MethodGet, testSimple)
+	app.AddEndpoint("/hello", http.MethodGet, func(w http.ResponseWriter, t *http.Request) {
+		fmt.Fprint(w, "hello, world")
+	})
 
 	app.Run(&http.Server{
 		Addr:           ":8000",

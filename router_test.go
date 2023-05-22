@@ -195,7 +195,7 @@ func TestServeHTTP(t *testing.T) {
 }
 
 func TestRedirectTrailingSlash(t *testing.T) {
-	router := NewRouter()
+	//router := NewRouter()
 
 	req, err := http.NewRequest(http.MethodGet, "/test/", nil)
 	if err != nil {
@@ -203,7 +203,7 @@ func TestRedirectTrailingSlash(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	redirect := router.RedirectTrailingSlash(rr, req)
+	redirect := RedirectTrailingSlash(rr, req)
 
 	// Check the status code is what we expect.
 	if status := rr.Code; status != http.StatusMovedPermanently {

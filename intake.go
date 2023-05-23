@@ -14,6 +14,7 @@ type Intake struct {
 	Router           *Router
 	GlobalMiddleware []MiddleWare
 	OptionsHandler   http.HandlerFunc
+	NotFoundHandler  http.HandlerFunc // TODO:(dean) implement
 }
 
 // New Create a new intake application
@@ -51,11 +52,14 @@ func (a *Intake) AddEndpoint(path string, verb string, finalHandler http.Handler
 		}
 	}
 
-	// Our wrapped function chain in a compatible httprouter AddEndpoint func
+	// add our wrapped handler chain to the router
 	a.Router.AddRoute(path, verb, finalHandler)
+
+	// if we want to handle OPTIONS request add the handler to router
 	if a.OptionsHandler != nil {
-		a.Router.AddRoute(path, verb, finalHandler)
+		a.Router.AddRoute(path, http.MethodOptions, a.OptionsHandler)
 	}
+
 	log.Println("added route", verb, path)
 }
 

@@ -1,5 +1,5 @@
 # Intake
-API framework written in Go. Intake uses `httprouter` (https://github.com/julienschmidt/httprouter) under the hood. 
+API framework written in Go.  
 
 Intake was written to be a simplistic framework for writing API servers. It was designed to not hide whats going on 
 during the lifetime of a request. In the spirit of Go, verbosity was chosen as to make the code more readable. I 
@@ -11,7 +11,7 @@ Sample server
 func main() {
     app := intake.New()
     
-    app.AddEndpoint("/hello", http.MethodGet, func(w http.ResponseWriter, t *http.Request) {
+    app.AddEndpoint("/hello", http.MethodGet, func(w http.ResponseWriter, r *http.Request) {
         fmt.Fprint(w,"hello, world")
     })
     
@@ -32,6 +32,7 @@ endpoints := intake.Endpoints{
     intake.NewEndpoint(http.MethodGet,"/test-ep-one", testEndpointOne),
     intake.NewEndpoint(http.MethodGet,"/test-ep-two", testEndpointTwo),
 }
+endpoints.Prefix("/api/v1") // Optional
 app.AddEndpoints(endpoints)
 ```
 
@@ -80,40 +81,11 @@ app := intake.NewDefault()
 app.AddGlobalMiddleware(someMiddleware)
 ```
 
-### Custom logger
-The intake app can accept a `logrus` custom logger.
-```go 
-l := logrus.New()
-l.SetLevel(logrus.DebugLevel)
-l.SetFormatter(&logrus.JSONFormatter{})
-app := intake.New(l)
-```
-
-### Request validation
-`Intake` provides a basic `UnmarshalJSON` function for validating requests (github.com/go-playground/validator)
-```go
-type sample struct {
-	Username string
-	Address string
-}
-
-func SimpleHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	var s sample
-	if err := intake.UnmarshalJSON(r.Body, &s);err != nil {
-		intake.RespondError(w,r,err, http.StatusBadRequest, "description of error here")
-		return
-	}
-	// do other things if valid 
-	intake.Respond(w, r, http.StatusOK, []byte("success"))
-	return
-}
-```
-
 ### Request context
 Usually used in middleware when doing distinct things on the request
 
 #### Adding objects to the request
-Adding the struct makes it available to downstream middleware
+Adding the struct makes it available to downstream middleware. The object must be JSON serializeable.
 ```go
 func someMiddleware(next intake.Handler) intake.Handler {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {

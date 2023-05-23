@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -47,10 +46,14 @@ func middlewareTwo(next http.HandlerFunc) http.HandlerFunc {
 
 func main() {
 	app := intake.New()
+	app.OptionsHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, PATCH")
+		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
+		w.WriteHeader(http.StatusOK)
+	}
 
-	app.AddEndpoint("/hello", http.MethodGet, func(w http.ResponseWriter, t *http.Request) {
-		fmt.Fprint(w, "hello, world")
-	})
+	app.AddEndpoint("/hello", http.MethodGet, testSimple)
 
 	app.Run(&http.Server{
 		Addr:           ":8000",

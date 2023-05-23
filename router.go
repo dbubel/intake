@@ -6,12 +6,14 @@ import (
 )
 
 type Router struct {
-	routes map[string]http.HandlerFunc
+	routes                map[string]http.HandlerFunc
+	RedirectTrailingSlash bool
 }
 
 func NewRouter() *Router {
 	return &Router{
-		routes: make(map[string]http.HandlerFunc),
+		routes:                make(map[string]http.HandlerFunc),
+		RedirectTrailingSlash: true,
 	}
 }
 
@@ -21,8 +23,10 @@ func (r *Router) AddRoute(route string, method string, handler http.HandlerFunc)
 
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Redirect if path ends with a trailing slash
-	if RedirectTrailingSlash(w, req) {
-		return
+	if r.RedirectTrailingSlash {
+		if RedirectTrailingSlash(w, req) {
+			return
+		}
 	}
 
 	handler, found := r.routes[req.Method+req.URL.Path]

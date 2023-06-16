@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/dbubel/intake"
-	"github.com/julienschmidt/httprouter"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/dbubel/intake"
+	"github.com/julienschmidt/httprouter"
+	"github.com/sirupsen/logrus"
 )
 
 type test struct {
@@ -44,7 +45,6 @@ func mw2(next intake.Handler) intake.Handler {
 }
 
 func main() {
-
 	apiLogger := logrus.New()
 	apiLogger.SetLevel(logrus.DebugLevel)
 	apiLogger.SetReportCaller(true)
@@ -60,12 +60,14 @@ func main() {
 		intake.GET("/test-get", testSimple),
 	}
 
-	//mw := Middleware{logger: apiLogger}
+	mw := Middleware{logger: apiLogger}
 
-	//app.AddGlobalMiddleware(mw.Logging)
+	app.AddGlobalMiddleware(mw.Logging)
 	app.AddGlobalMiddleware(mw2)
 	app.AddGlobalMiddleware(mw1)
 	app.AddEndpoints(eps)
+
+	app.AttachPprofTraceEndpoints()
 
 	app.Run(&http.Server{
 		Addr:           ":8000",

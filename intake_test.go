@@ -3,13 +3,13 @@ package intake
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,15 +17,18 @@ type testPayload struct {
 	Msg string `json:"msg"`
 }
 
-var payload = testPayload{Msg: "payload"}
-var l *logrus.Logger
+var (
+	payload = testPayload{Msg: "payload"}
+	l       *logrus.Logger
+)
 
 func init() {
 	l = logrus.New()
 	l.SetLevel(logrus.InfoLevel)
 }
+
 func TestIntake(t *testing.T) {
-	var app = New(l)
+	app := New(l)
 
 	testHandler := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		RespondJSON(w, r, http.StatusOK, payload)
@@ -45,9 +48,12 @@ func TestIntake(t *testing.T) {
 		var res testPayload
 		assert.NoError(t, json.Unmarshal(resp, &res))
 		assert.Equal(t, "payload", res.Msg)
+    fmt.Println("hello")
+     
 	})
 
 	t.Run("test route not found", func(t *testing.T) {
+    fmt.Println("hello2")
 		r := httptest.NewRequest(http.MethodGet, "/not-found", nil)
 		w := httptest.NewRecorder()
 		app.Router.ServeHTTP(w, r)
@@ -57,7 +63,7 @@ func TestIntake(t *testing.T) {
 }
 
 func TestIntakeMiddleware(t *testing.T) {
-	var app = NewDefault()
+	app := NewDefault()
 	testHandler := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
 		RespondJSON(w, r, http.StatusOK, payload)
 	}
@@ -134,7 +140,7 @@ func TestIntakeMiddleware(t *testing.T) {
 }
 
 func TestIntakeMiddlewareGroups(t *testing.T) {
-	var app = New(l)
+	app := New(l)
 
 	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
 		var helloStr string
@@ -186,7 +192,7 @@ func TestIntakeMiddlewareGroups(t *testing.T) {
 }
 
 func TestIntakeGlobalMiddleware(t *testing.T) {
-	var app = New(l)
+	app := New(l)
 
 	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
 		var helloStr string
@@ -231,5 +237,4 @@ func TestIntakeGlobalMiddleware(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(resp, &res))
 		assert.Equal(t, "hello world global middleware", res)
 	})
-
 }

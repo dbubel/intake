@@ -1,6 +1,6 @@
 module github.com/dbubel/intake
 
-go 1.17
+go 1.22
 
 require (
 	github.com/go-playground/universal-translator v0.18.0 // indirect

@@ -2,37 +2,28 @@ package intake
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/julienschmidt/httprouter"
-	"github.com/sirupsen/logrus"
 )
 
+// TODO: OPTIONS handler
+type MiddleWare func(http.HandlerFunc) http.HandlerFunc
+
 type Intake struct {
-	Router           *httprouter.Router
-	Logger           *logrus.Logger
-	GlobalMiddleware []MiddleWare
+	Mux                *http.ServeMux
+	PanicHandler       func(http.ResponseWriter, *http.Request, interface{})
+	GlobalMiddleware   []MiddleWare
+	OptionsHandlerFunc http.HandlerFunc
 }
 
-func New(log *logrus.Logger) *Intake {
+func New() *Intake {
 	return &Intake{
-		Router:           httprouter.New(),
-		Logger:           log,
 		GlobalMiddleware: make([]MiddleWare, 0, 0),
-	}
-}
-
-func NewDefault() *Intake {
-	apiLogger := logrus.New()
-	apiLogger.SetLevel(logrus.DebugLevel)
-	apiLogger.SetFormatter(&logrus.JSONFormatter{})
-	return &Intake{
-		Router: httprouter.New(),
-		Logger: apiLogger,
+		Mux:              http.NewServeMux(),
 	}
 }
 
@@ -49,7 +40,11 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 	}
 }
 
-func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, middleware ...MiddleWare) {
+func (a *Intake) OptionsHandler(h http.HandlerFunc) {
+	a.OptionsHandlerFunc = h
+}
+
+func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
 	// Prepend the global middlewares to the route specific middleware
 	// global middleware will be called first in the chain in the order they are added
 	mws := append(a.GlobalMiddleware, middleware...)
@@ -59,11 +54,13 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler Handler, mid
 		}
 	}
 
-	// Our wrapped function chain in a compatible httprouter AddEndpoint func
-	a.Router.Handle(verb, path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		finalHandler(w, r, params)
+	a.Mux.HandleFunc(fmt.Sprintf("%s %s", verb, path), func(w http.ResponseWriter, r *http.Request) {
+		finalHandler(w, r)
 	})
-	a.Logger.WithFields(logrus.Fields{"verb": verb, "path": path}).Debug("added route")
+	if a.OptionsHandlerFunc != nil {
+		a.Mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodOptions, path), a.OptionsHandlerFunc)
+	}
+	fmt.Printf("added route %s %s\n", verb, path)
 }
 
 func (a *Intake) Run(server *http.Server) {
@@ -74,22 +71,28 @@ func (a *Intake) Run(server *http.Server) {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	a.Logger.WithFields(logrus.Fields{"addr": server.Addr}).Info("server starting")
+	fmt.Printf("server running on port [%s]\n", server.Addr)
 
 	// Blocking main and waiting for shutdown.
 	select {
 	case err := <-serverErrors:
-		a.Logger.WithError(err).Error("error starting server")
+		fmt.Printf("error starting server [%s]\n", err.Error())
 	case <-osSignals:
-		a.Logger.Info("shutdown received shedding connections...")
+		fmt.Println("shutdown received shedding connections...")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			a.Logger.WithError(err).Error("graceful shutdown did not complete in allowed time")
+			fmt.Println("graceful shutdown did not complete in allowed time")
 			if err := server.Close(); err != nil {
-				a.Logger.WithError(err).Error("could not stop http server")
+				fmt.Printf("error calling close for server shut down [%s]\n", err.Error())
 			}
 		}
-		a.Logger.Info("shutdown OK")
+		fmt.Println("server shutdown OK")
+	}
+}
+
+func (r *Intake) recv(w http.ResponseWriter, req *http.Request) {
+	if rcv := recover(); rcv != nil {
+		r.PanicHandler(w, req, rcv)
 	}
 }

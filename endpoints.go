@@ -16,6 +16,7 @@ func (e Endpoints) Append(mid ...MiddleWare) {
 }
 
 // Prepend add middleware to the front of the chain for the endpoint group
+// but after the global middleware
 func (e Endpoints) Prepend(mid ...MiddleWare) {
 	mw := make([]MiddleWare, 0, 0)
 	mw = append(mw, mid...)

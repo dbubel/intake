@@ -20,6 +20,7 @@ type Intake struct {
 	OptionsHandlerFunc http.HandlerFunc
 }
 
+
 func New() *Intake {
 	return &Intake{
 		GlobalMiddleware: make([]MiddleWare, 0, 0),

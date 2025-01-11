@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dbubel/intake"
+	"github.com/dbubel/intake/v2"
 )
 
 func a(w http.ResponseWriter, r *http.Request) {

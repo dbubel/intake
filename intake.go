@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// TODO: OPTIONS handler
 type MiddleWare func(http.HandlerFunc) http.HandlerFunc
 
 type Intake struct {
@@ -18,13 +17,15 @@ type Intake struct {
 	PanicHandler       func(http.ResponseWriter, *http.Request, interface{})
 	GlobalMiddleware   []MiddleWare
 	OptionsHandlerFunc http.HandlerFunc
+	// Track paths that already have OPTIONS handlers
+	optionsPaths map[string]bool
 }
-
 
 func New() *Intake {
 	return &Intake{
-		GlobalMiddleware: make([]MiddleWare, 0, 0),
+		GlobalMiddleware: make([]MiddleWare, 0),
 		Mux:              http.NewServeMux(),
+		optionsPaths:     make(map[string]bool),
 	}
 }
 
@@ -43,6 +44,9 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 
 func (a *Intake) OptionsHandler(h http.HandlerFunc) {
 	a.OptionsHandlerFunc = h
+	// When setting a new OPTIONS handler, we need to clear existing paths
+	// in case the handler has changed
+	a.optionsPaths = make(map[string]bool)
 }
 
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
@@ -58,9 +62,13 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 	a.Mux.HandleFunc(fmt.Sprintf("%s %s", verb, path), func(w http.ResponseWriter, r *http.Request) {
 		finalHandler(w, r)
 	})
-	if a.OptionsHandlerFunc != nil {
+
+	// Only add OPTIONS handler if we have one and haven't already added it for this path
+	if a.OptionsHandlerFunc != nil && !a.optionsPaths[path] {
 		a.Mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodOptions, path), a.OptionsHandlerFunc)
+		a.optionsPaths[path] = true
 	}
+
 	fmt.Printf("added route %s %s\n", verb, path)
 }
 

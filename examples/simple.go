@@ -20,7 +20,9 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
 		w.WriteHeader(http.StatusOK)
 	})
+
 	app.AddEndpoint(http.MethodGet, "/hello", a, w, w2)
+	app.AddGlobalMiddleware(w2)
 
 	app.Run(&http.Server{
 		Addr:           ":8080",

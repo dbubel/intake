@@ -2,234 +2,142 @@ package intake
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/julienschmidt/httprouter"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testPayload struct {
 	Msg string `json:"msg"`
 }
 
-var payload = testPayload{Msg: "payload"}
-var l *logrus.Logger
-
-func init() {
-	l = logrus.New()
-	l.SetLevel(logrus.InfoLevel)
-}
 func TestIntake(t *testing.T) {
-	var app = New(l)
+	payload := testPayload{Msg: "test response"}
+	var app = New()
 
-	testHandler := func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, payload)
+	testHandler := func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(payload)
 	}
 
-	app.AddEndpoint(http.MethodGet, "/test", testHandler)
+	t.Run("test single endpoint", func(t *testing.T) {
+		app.AddEndpoint(http.MethodGet, "/test", testHandler)
 
-	t.Run("test simple route", func(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
+		app.Mux.ServeHTTP(w, r)
 
-		assert.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 		resp, err := ioutil.ReadAll(w.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		var res testPayload
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "payload", res.Msg)
+		require.NoError(t, json.Unmarshal(resp, &res))
+		require.Equal(t, "test response", res.Msg)
 	})
 
-	t.Run("test route not found", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/not-found", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusNotFound, w.Code)
-	})
-}
-
-func TestIntakeMiddleware(t *testing.T) {
-	var app = NewDefault()
-	testHandler := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		RespondJSON(w, r, http.StatusOK, payload)
-	}
-	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-		RespondJSON(w, r, http.StatusOK, helloStr)
-	}
-	testHandlerWithCtxTwo := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-
-		var helloStrTwo string
-		FromContext(r, "onCtxTwo", &helloStrTwo)
-		RespondJSON(w, r, http.StatusOK, fmt.Sprintf("%s %s", helloStr, helloStrTwo))
-	}
-	testMw := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			next(w, r, params)
+	t.Run("test options handler", func(t *testing.T) {
+		optionsHandler := func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Allow", "GET, POST, OPTIONS")
+			w.WriteHeader(http.StatusOK)
 		}
-	}
-	testMwWithCtx := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtx", "hello world")
-			next(w, r, params)
+
+		app.OptionsHandler(optionsHandler)
+		app.AddEndpoint(http.MethodGet, "/test-options", testHandler)
+		app.AddEndpoint(http.MethodPost, "/test-options", testHandler)
+
+		r := httptest.NewRequest(http.MethodOptions, "/test-options", nil)
+		w := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w, r)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, "GET, POST, OPTIONS", w.Header().Get("Allow"))
+	})
+
+	t.Run("test middleware execution", func(t *testing.T) {
+		middlewareCalled := false
+		middleware := func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				middlewareCalled = true
+				next(w, r)
+			}
 		}
-	}
-	testMwWithCtxTwo := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtxTwo", "hello world two")
-			next(w, r, params)
+
+		app.AddGlobalMiddleware(middleware)
+		app.AddEndpoint(http.MethodGet, "/test-middleware", testHandler)
+
+		r := httptest.NewRequest(http.MethodGet, "/test-middleware", nil)
+		w := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w, r)
+
+		require.True(t, middlewareCalled)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("test adding multiple endpoints", func(t *testing.T) {
+		handler1Called := false
+		handler2Called := false
+
+		handler1 := func(w http.ResponseWriter, r *http.Request) {
+			handler1Called = true
+			w.WriteHeader(http.StatusOK)
 		}
-	}
 
-	app.AddEndpoint(http.MethodGet, "/test-mw-simple", testHandler, testMw)
-	app.AddEndpoint(http.MethodGet, "/test-mw-simple-with-context", testHandlerWithCtx, testMwWithCtx)
-	app.AddEndpoint(http.MethodGet, "/test-mw-simple-with-context-two", testHandlerWithCtxTwo, testMwWithCtx, testMwWithCtxTwo)
-
-	t.Run("test route with middleware", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
-
-	t.Run("test route with middleware context", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
-		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world", res)
-	})
-
-	t.Run("test route with middleware with two contexts", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-mw-simple-with-context-two", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
-		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world hello world two", res)
-	})
-}
-
-func TestIntakeMiddlewareGroups(t *testing.T) {
-	var app = New(l)
-
-	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-		RespondJSON(w, r, http.StatusOK, helloStr)
-	}
-
-	testMwWithCtx := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtx", "hello world")
-			next(w, r, params)
+		handler2 := func(w http.ResponseWriter, r *http.Request) {
+			handler2Called = true
+			w.WriteHeader(http.StatusCreated)
 		}
-	}
 
-	eps := Endpoints{
-		GET("/test-one", testHandlerWithCtx),
-		GET("/test-two", testHandlerWithCtx),
-	}
-	eps.Use(testMwWithCtx)
-	app.AddEndpoints(eps)
-
-	t.Run("test route with middleware group", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-one", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
-		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world", res)
-	})
-
-	t.Run("test route with middleware group second route", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-two", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
-		assert.NoError(t, err)
-
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world", res)
-	})
-}
-
-func TestIntakeGlobalMiddleware(t *testing.T) {
-	var app = New(l)
-
-	testHandlerWithCtx := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		var helloStr string
-		FromContext(r, "onCtx", &helloStr)
-
-		var global string
-		FromContext(r, "global", &global)
-		RespondJSON(w, r, http.StatusOK, fmt.Sprintf("%s %s", helloStr, global))
-	}
-
-	testMwWithCtx := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "onCtx", "hello world")
-			next(w, r, params)
+		endpoints := Endpoints{
+			{
+				Verb:            http.MethodGet,
+				Path:            "/multiple1",
+				EndpointHandler: handler1,
+			},
+			{
+				Verb:            http.MethodPost,
+				Path:            "/multiple2",
+				EndpointHandler: handler2,
+			},
 		}
-	}
 
-	testMwGlobal := func(next Handler) Handler {
-		return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			AddToContext(r, "global", "global middleware")
-			next(w, r, params)
-		}
-	}
-	app.AddGlobalMiddleware(testMwGlobal)
+		app.AddEndpoints(endpoints)
 
-	eps := Endpoints{
-		GET("/test-one", testHandlerWithCtx),
-	}
-	eps.Use(testMwWithCtx)
-	app.AddEndpoints(eps)
+		// Test first endpoint
+		r1 := httptest.NewRequest(http.MethodGet, "/multiple1", nil)
+		w1 := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w1, r1)
 
-	t.Run("test route with middleware group", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/test-one", nil)
-		w := httptest.NewRecorder()
-		app.Router.ServeHTTP(w, r)
+		require.True(t, handler1Called)
+		require.Equal(t, http.StatusOK, w1.Code)
 
-		assert.Equal(t, http.StatusOK, w.Code)
-		resp, err := ioutil.ReadAll(w.Body)
-		assert.NoError(t, err)
+		// Test second endpoint
+		r2 := httptest.NewRequest(http.MethodPost, "/multiple2", nil)
+		w2 := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w2, r2)
 
-		var res string
-		assert.NoError(t, json.Unmarshal(resp, &res))
-		assert.Equal(t, "hello world global middleware", res)
+		require.True(t, handler2Called)
+		require.Equal(t, http.StatusCreated, w2.Code)
 	})
 
+	t.Run("test duplicate options handler", func(t *testing.T) {
+		optionsCallCount := 0
+		optionsHandler := func(w http.ResponseWriter, r *http.Request) {
+			optionsCallCount++
+			w.WriteHeader(http.StatusOK)
+		}
+
+		app.OptionsHandler(optionsHandler)
+		app.AddEndpoint(http.MethodGet, "/test-duplicate", testHandler)
+		app.AddEndpoint(http.MethodPost, "/test-duplicate", testHandler)
+
+		r := httptest.NewRequest(http.MethodOptions, "/test-duplicate", nil)
+		w := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w, r)
+
+		require.Equal(t, 1, optionsCallCount)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
 }

@@ -1,3 +1,4 @@
+// Package intake provides HTTP response utilities for common content types.
 package intake
 
 import (
@@ -6,54 +7,30 @@ import (
 	"net/http"
 )
 
-func RespondJSONEncode(w http.ResponseWriter, r *http.Request, code int, data interface{}) error {
-	if err := AddToContext(r, "response-code", code); err != nil {
-		return err
-	}
-
+// RespondJSON writes a JSON response with the specified HTTP status code.
+// It automatically sets the Content-Type header to "application/json" and
+// marshals the provided data into JSON format. If marshaling fails, the error
+// is returned to the caller.
+func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	return json.NewEncoder(w).Encode(data)
 }
 
-func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) (int, error) {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		resp, _ := json.Marshal(map[string]string{
-			"error":       err.Error(),
-			"description": "error marshalling response to JSON",
-		})
-		return Respond(w, r, http.StatusInternalServerError, resp)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	return Respond(w, r, code, jsonData)
-}
-
-func RespondXML(w http.ResponseWriter, r *http.Request, code int, data interface{}) (int, error) {
-	jsonData, err := xml.Marshal(data)
-	if err != nil {
-		resp, _ := xml.Marshal(map[string]string{
-			"error":       err.Error(),
-			"description": "error marshalling response to XML",
-		})
-		return Respond(w, r, http.StatusInternalServerError, resp)
-	}
+// RespondXML writes an XML response with the specified HTTP status code.
+// It automatically sets the Content-Type header to "application/xml" and
+// marshals the provided data into XML format. If marshaling fails, the error
+// is returned to the caller.
+func RespondXML(w http.ResponseWriter, r *http.Request, code int, data interface{}) error {
 	w.Header().Set("Content-Type", "application/xml")
-	return Respond(w, r, code, jsonData)
+	w.WriteHeader(code)
+	return xml.NewEncoder(w).Encode(data)
 }
 
+// Respond writes raw bytes as an HTTP response with the specified status code.
+// If no Content-Type header is set, it attempts to detect the content type from
+// the data. Returns the number of bytes written and any error that occurred.
 func Respond(w http.ResponseWriter, r *http.Request, code int, data []byte) (int, error) {
-	err := AddToContext(r, "response-code", code)
-	if err != nil {
-		return -1, err
-	}
-
-	err = AddToContext(r, "response-length", len(data))
-	if err != nil {
-		return -1, err
-	}
-
-	// content type is not set so attempt to set it
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", http.DetectContentType(data))
 	}

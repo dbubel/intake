@@ -1,3 +1,4 @@
+// Package intake implements a simple HTTP router with middleware support.
 package intake
 
 import (
@@ -10,30 +11,42 @@ import (
 	"time"
 )
 
+// MiddleWare defines a function that wraps an http.HandlerFunc with additional behavior.
 type MiddleWare func(http.HandlerFunc) http.HandlerFunc
 
+// Intake represents an HTTP router with middleware and panic recovery support.
 type Intake struct {
-	Mux                *http.ServeMux
-	PanicHandler       func(http.ResponseWriter, *http.Request, interface{})
-	GlobalMiddleware   []MiddleWare
+	// Mux is the underlying HTTP request multiplexer
+	Mux *http.ServeMux
+	// PanicHandler handles any panics that occur during request processing
+	PanicHandler func(http.ResponseWriter, *http.Request, interface{})
+	// GlobalMiddleware contains middleware applied to all routes
+	GlobalMiddleware []MiddleWare
+	// OptionsHandlerFunc handles OPTIONS requests
 	OptionsHandlerFunc http.HandlerFunc
-	// Track paths that already have OPTIONS handlers
+	// optionsPaths tracks paths with OPTIONS handlers
 	optionsPaths map[string]bool
+	// registeredRoutes maps paths to their HTTP methods
+	registeredRoutes map[string][]string
 }
 
+// New creates a new Intake instance with initialized maps and slices.
 func New() *Intake {
 	return &Intake{
 		GlobalMiddleware: make([]MiddleWare, 0),
 		Mux:              http.NewServeMux(),
 		optionsPaths:     make(map[string]bool),
+		registeredRoutes: make(map[string][]string),
 	}
 }
 
-// AddGlobalMiddleware Global middleware MUST be added before other routes
+// AddGlobalMiddleware adds middleware that will be applied to all routes.
+// Global middleware must be added before registering routes.
 func (a *Intake) AddGlobalMiddleware(mw MiddleWare) {
 	a.GlobalMiddleware = append(a.GlobalMiddleware, mw)
 }
 
+// AddEndpoints registers multiple endpoints at once.
 func (a *Intake) AddEndpoints(e ...Endpoints) {
 	for x := 0; x < len(e); x++ {
 		for i := 0; i < len(e[x]); i++ {
@@ -42,16 +55,15 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 	}
 }
 
+// OptionsHandler sets the handler for OPTIONS requests across all routes.
 func (a *Intake) OptionsHandler(h http.HandlerFunc) {
 	a.OptionsHandlerFunc = h
-	// When setting a new OPTIONS handler, we need to clear existing paths
-	// in case the handler has changed
 	a.optionsPaths = make(map[string]bool)
 }
 
+// AddEndpoint registers a new route with the specified HTTP method and path.
+// It applies both global and route-specific middleware to the handler.
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
-	// Prepend the global middlewares to the route specific middleware
-	// global middleware will be called first in the chain in the order they are added
 	mws := append(a.GlobalMiddleware, middleware...)
 	for i := len(mws) - 1; i >= 0; i-- {
 		if mws[i] != nil {
@@ -59,19 +71,31 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 		}
 	}
 
-	a.Mux.HandleFunc(fmt.Sprintf("%s %s", verb, path), func(w http.ResponseWriter, r *http.Request) {
+	// Store the route in our registry
+	if methods, exists := a.registeredRoutes[path]; exists {
+		a.registeredRoutes[path] = append(methods, verb)
+	} else {
+		a.registeredRoutes[path] = []string{verb}
+	}
+
+	handlerKey := fmt.Sprintf("%s %s", verb, path)
+	a.Mux.HandleFunc(handlerKey, func(w http.ResponseWriter, r *http.Request) {
 		finalHandler(w, r)
 	})
 
-	// Only add OPTIONS handler if we have one and haven't already added it for this path
 	if a.OptionsHandlerFunc != nil && !a.optionsPaths[path] {
-		a.Mux.HandleFunc(fmt.Sprintf("%s %s", http.MethodOptions, path), a.OptionsHandlerFunc)
+		optionsKey := fmt.Sprintf("%s %s", http.MethodOptions, path)
+		a.Mux.HandleFunc(optionsKey, a.OptionsHandlerFunc)
+		if methods, exists := a.registeredRoutes[path]; exists {
+			a.registeredRoutes[path] = append(methods, http.MethodOptions)
+		} else {
+			a.registeredRoutes[path] = []string{http.MethodOptions}
+		}
 		a.optionsPaths[path] = true
 	}
-
-	fmt.Printf("added route %s %s\n", verb, path)
 }
 
+// Run starts the HTTP server and handles graceful shutdown on SIGINT/SIGTERM.
 func (a *Intake) Run(server *http.Server) {
 	serverErrors := make(chan error, 1)
 	osSignals := make(chan os.Signal, 1)
@@ -80,28 +104,24 @@ func (a *Intake) Run(server *http.Server) {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	fmt.Printf("server running on port [%s]\n", server.Addr)
-
 	// Blocking main and waiting for shutdown.
 	select {
-	case err := <-serverErrors:
-		fmt.Printf("error starting server [%s]\n", err.Error())
+	case <-serverErrors:
 	case <-osSignals:
-		fmt.Println("shutdown received shedding connections...")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			fmt.Println("graceful shutdown did not complete in allowed time")
 			if err := server.Close(); err != nil {
-				fmt.Printf("error calling close for server shut down [%s]\n", err.Error())
 			}
 		}
-		fmt.Println("server shutdown OK")
 	}
 }
 
-func (r *Intake) recv(w http.ResponseWriter, req *http.Request) {
-	if rcv := recover(); rcv != nil {
-		r.PanicHandler(w, req, rcv)
+// GetRoutes returns a map of paths to their supported HTTP methods.
+func (a *Intake) GetRoutes() map[string][]string {
+	routes := make(map[string][]string)
+	for path, methods := range a.registeredRoutes {
+		routes[path] = append([]string{}, methods...)
 	}
+	return routes
 }

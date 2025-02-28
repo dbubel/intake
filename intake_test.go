@@ -76,6 +76,52 @@ func TestIntake(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code)
 	})
 
+	t.Run("test adding multiple endpoints", func(t *testing.T) {
+		handler1Called := false
+		handler2Called := false
+
+		handler1 := func(w http.ResponseWriter, r *http.Request) {
+			handler1Called = true
+			w.WriteHeader(http.StatusOK)
+		}
+
+		handler2 := func(w http.ResponseWriter, r *http.Request) {
+			handler2Called = true
+			w.WriteHeader(http.StatusCreated)
+		}
+
+		endpoints := Endpoints{
+			{
+				Verb:            http.MethodGet,
+				Path:            "/multiple1",
+				EndpointHandler: handler1,
+			},
+			{
+				Verb:            http.MethodPost,
+				Path:            "/multiple2",
+				EndpointHandler: handler2,
+			},
+		}
+
+		app.AddEndpoints(endpoints)
+
+		// Test first endpoint
+		r1 := httptest.NewRequest(http.MethodGet, "/multiple1", nil)
+		w1 := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w1, r1)
+
+		require.True(t, handler1Called)
+		require.Equal(t, http.StatusOK, w1.Code)
+
+		// Test second endpoint
+		r2 := httptest.NewRequest(http.MethodPost, "/multiple2", nil)
+		w2 := httptest.NewRecorder()
+		app.Mux.ServeHTTP(w2, r2)
+
+		require.True(t, handler2Called)
+		require.Equal(t, http.StatusCreated, w2.Code)
+	})
+
 	t.Run("test duplicate options handler", func(t *testing.T) {
 		optionsCallCount := 0
 		optionsHandler := func(w http.ResponseWriter, r *http.Request) {

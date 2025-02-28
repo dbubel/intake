@@ -24,6 +24,10 @@ func main() {
 	app.AddEndpoint(http.MethodGet, "/hello", a, w, w2)
 	app.AddGlobalMiddleware(w2)
 
+	rs := app.GetRoutes()
+	for k, v := range rs {
+		fmt.Println(k, v)
+	}
 	app.Run(&http.Server{
 		Addr:           ":8080",
 		Handler:        app.Mux,

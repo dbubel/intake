@@ -260,7 +260,7 @@ func main() {
         MaxHeaderBytes: 1 << 20,
     })
 }
-
+```
 ## License
 
 MIT

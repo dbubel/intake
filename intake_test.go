@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 type testPayload struct {
@@ -29,13 +27,21 @@ func TestIntake(t *testing.T) {
 		w := httptest.NewRecorder()
 		app.Mux.ServeHTTP(w, r)
 
-		require.Equal(t, http.StatusOK, w.Code)
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+		}
 		resp, err := ioutil.ReadAll(w.Body)
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatalf("Failed to read response body: %v", err)
+		}
 
 		var res testPayload
-		require.NoError(t, json.Unmarshal(resp, &res))
-		require.Equal(t, "test response", res.Msg)
+		if err := json.Unmarshal(resp, &res); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+		if res.Msg != "test response" {
+			t.Errorf("Expected message %q, got %q", "test response", res.Msg)
+		}
 	})
 
 	t.Run("test options handler", func(t *testing.T) {
@@ -52,8 +58,12 @@ func TestIntake(t *testing.T) {
 		w := httptest.NewRecorder()
 		app.Mux.ServeHTTP(w, r)
 
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, "GET, POST, OPTIONS", w.Header().Get("Allow"))
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+		}
+		if allow := w.Header().Get("Allow"); allow != "GET, POST, OPTIONS" {
+			t.Errorf("Expected Allow header %q, got %q", "GET, POST, OPTIONS", allow)
+		}
 	})
 
 	t.Run("test middleware execution", func(t *testing.T) {
@@ -72,8 +82,12 @@ func TestIntake(t *testing.T) {
 		w := httptest.NewRecorder()
 		app.Mux.ServeHTTP(w, r)
 
-		require.True(t, middlewareCalled)
-		require.Equal(t, http.StatusOK, w.Code)
+		if !middlewareCalled {
+			t.Error("Expected middleware to be called, but it wasn't")
+		}
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+		}
 	})
 
 	t.Run("test adding multiple endpoints", func(t *testing.T) {
@@ -110,16 +124,24 @@ func TestIntake(t *testing.T) {
 		w1 := httptest.NewRecorder()
 		app.Mux.ServeHTTP(w1, r1)
 
-		require.True(t, handler1Called)
-		require.Equal(t, http.StatusOK, w1.Code)
+		if !handler1Called {
+			t.Error("Expected handler1 to be called, but it wasn't")
+		}
+		if w1.Code != http.StatusOK {
+			t.Errorf("Expected status code %d, got %d", http.StatusOK, w1.Code)
+		}
 
 		// Test second endpoint
 		r2 := httptest.NewRequest(http.MethodPost, "/multiple2", nil)
 		w2 := httptest.NewRecorder()
 		app.Mux.ServeHTTP(w2, r2)
 
-		require.True(t, handler2Called)
-		require.Equal(t, http.StatusCreated, w2.Code)
+		if !handler2Called {
+			t.Error("Expected handler2 to be called, but it wasn't")
+		}
+		if w2.Code != http.StatusCreated {
+			t.Errorf("Expected status code %d, got %d", http.StatusCreated, w2.Code)
+		}
 	})
 
 	t.Run("test duplicate options handler", func(t *testing.T) {
@@ -137,7 +159,11 @@ func TestIntake(t *testing.T) {
 		w := httptest.NewRecorder()
 		app.Mux.ServeHTTP(w, r)
 
-		require.Equal(t, 1, optionsCallCount)
-		require.Equal(t, http.StatusOK, w.Code)
+		if optionsCallCount != 1 {
+			t.Errorf("Expected options handler to be called once, got %d calls", optionsCallCount)
+		}
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+		}
 	})
 }

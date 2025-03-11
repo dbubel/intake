@@ -66,6 +66,3 @@ func Respond(w http.ResponseWriter, r *http.Request, code int, data []byte) (int
 	w.WriteHeader(code)
 	return w.Write(data)
 }
- kubectl config use-context cohesion-development
- aws sso login --profile=rv-cohesion-development
- aws-vault exec rv-cohesion-development -- k9s  

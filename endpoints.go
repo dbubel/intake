@@ -15,7 +15,7 @@ type Endpoints []endpoint
 // Parameters:
 //   - mid: A variadic list of middleware functions to add to all endpoints
 func (e Endpoints) Use(mid ...MiddleWare) {
-	for i := 0; i < len(e); i++ {
+	for i := range e {
 		e[i].MiddlewareHandlers = append(e[i].MiddlewareHandlers, mid...)
 	}
 }
@@ -41,7 +41,7 @@ func (e Endpoints) Append(mid ...MiddleWare) {
 func (e Endpoints) Prepend(mid ...MiddleWare) {
 	mw := make([]MiddleWare, 0)
 	mw = append(mw, mid...)
-	for i := 0; i < len(e); i++ {
+	for i := range e {
 		e[i].MiddlewareHandlers = append(mw, e[i].MiddlewareHandlers...)
 	}
 }

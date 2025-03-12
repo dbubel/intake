@@ -21,7 +21,7 @@ import (
 //
 // Returns:
 //   - An error if JSON marshaling fails, nil otherwise
-func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) error {
+func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data any) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	return json.NewEncoder(w).Encode(data)
@@ -39,7 +39,7 @@ func RespondJSON(w http.ResponseWriter, r *http.Request, code int, data interfac
 //
 // Returns:
 //   - An error if XML marshaling fails, nil otherwise
-func RespondXML(w http.ResponseWriter, r *http.Request, code int, data interface{}) error {
+func RespondXML(w http.ResponseWriter, r *http.Request, code int, data any) error {
 	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(code)
 	return xml.NewEncoder(w).Encode(data)

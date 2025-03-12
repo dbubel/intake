@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 )
@@ -27,7 +28,7 @@ type Intake struct {
 	// Mux is the underlying HTTP request multiplexer
 	Mux *http.ServeMux
 	// PanicHandler handles any panics that occur during request processing
-	PanicHandler func(http.ResponseWriter, *http.Request, interface{})
+	PanicHandler func(http.ResponseWriter, *http.Request, any)
 	// GlobalMiddleware contains middleware applied to all routes
 	GlobalMiddleware []MiddleWare
 	// OptionsHandlerFunc handles OPTIONS requests
@@ -70,8 +71,8 @@ func (a *Intake) AddGlobalMiddleware(mw MiddleWare) {
 // Parameters:
 //   - e: A variadic parameter of Endpoints slices to register.
 func (a *Intake) AddEndpoints(e ...Endpoints) {
-	for x := 0; x < len(e); x++ {
-		for i := 0; i < len(e[x]); i++ {
+	for x := range e {
+		for i := range e[x] {
 			a.AddEndpoint(e[x][i].Verb, e[x][i].Path, e[x][i].EndpointHandler, e[x][i].MiddlewareHandlers...)
 		}
 	}
@@ -171,7 +172,7 @@ func (a *Intake) Run(server *http.Server) {
 func (a *Intake) GetRoutes() map[string][]string {
 	routes := make(map[string][]string)
 	for path, methods := range a.registeredRoutes {
-		routes[path] = append([]string{}, methods...)
+		routes[path] = slices.Clone(methods)
 	}
 	return routes
 }

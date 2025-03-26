@@ -77,6 +77,7 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 	} else {
 		a.registeredRoutes[path] = []string{verb}
 	}
+	// comment
 
 	handlerKey := fmt.Sprintf("%s %s", verb, path)
 	a.Mux.HandleFunc(handlerKey, func(w http.ResponseWriter, r *http.Request) {

@@ -167,15 +167,26 @@ intake.Respond(w, r, http.StatusOK, []byte("Hello, World!"))
 
 ## OPTIONS Requests
 
-Intake makes it easy to handle OPTIONS requests for CORS:
+Intake allows you to create middleware for handling OPTIONS requests for CORS:
 
 ```go
-app.OptionsHandler(func(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Access-Control-Allow-Origin", "*")
-    w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-    w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
-    w.WriteHeader(http.StatusOK)
-})
+// Create a middleware for handling OPTIONS requests
+optionsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Handle OPTIONS requests
+        if r.Method == http.MethodOptions {
+            w.Header().Set("Access-Control-Allow-Origin", "*")
+            w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+            w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+        next(w, r)
+    }
+}
+
+// Add it as global middleware
+app.AddGlobalMiddleware(optionsMiddleware)
 ```
 
 ## Complete Example
@@ -219,13 +230,22 @@ func main() {
         })
     }
     
-    // Define OPTIONS handler
-    app.OptionsHandler(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Access-Control-Allow-Origin", "*")
-        w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-        w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
-        w.WriteHeader(http.StatusOK)
-    })
+    // Define OPTIONS middleware
+    optionsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+        return func(w http.ResponseWriter, r *http.Request) {
+            if r.Method == http.MethodOptions {
+                w.Header().Set("Access-Control-Allow-Origin", "*")
+                w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+                w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
+                w.WriteHeader(http.StatusOK)
+                return
+            }
+            next(w, r)
+        }
+    }
+    
+    // Add OPTIONS middleware globally
+    app.AddGlobalMiddleware(optionsMiddleware)
     
     // Create endpoints
     apiEndpoints := intake.Endpoints{

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -41,28 +42,6 @@ func TestIntake(t *testing.T) {
 		}
 		if res.Msg != "test response" {
 			t.Errorf("Expected message %q, got %q", "test response", res.Msg)
-		}
-	})
-
-	t.Run("test options handler", func(t *testing.T) {
-		optionsHandler := func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Allow", "GET, POST, OPTIONS")
-			w.WriteHeader(http.StatusOK)
-		}
-
-		app.OptionsHandler(optionsHandler)
-		app.AddEndpoint(http.MethodGet, "/test-options", testHandler)
-		app.AddEndpoint(http.MethodPost, "/test-options", testHandler)
-
-		r := httptest.NewRequest(http.MethodOptions, "/test-options", nil)
-		w := httptest.NewRecorder()
-		app.Mux.ServeHTTP(w, r)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
-		}
-		if allow := w.Header().Get("Allow"); allow != "GET, POST, OPTIONS" {
-			t.Errorf("Expected Allow header %q, got %q", "GET, POST, OPTIONS", allow)
 		}
 	})
 
@@ -144,26 +123,79 @@ func TestIntake(t *testing.T) {
 		}
 	})
 
-	t.Run("test duplicate options handler", func(t *testing.T) {
-		optionsCallCount := 0
-		optionsHandler := func(w http.ResponseWriter, r *http.Request) {
-			optionsCallCount++
+	t.Run("test CORS middleware", func(t *testing.T) {
+		newApp := New()
+
+		// Create CORS middleware
+		corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodOptions {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+					w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+
+				// Set CORS headers for non-OPTIONS methods as well
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				next(w, r)
+			}
+		}
+
+		// Apply CORS middleware globally
+		newApp.AddGlobalMiddleware(corsMiddleware)
+
+		// Add test endpoints with explicit support for OPTIONS method
+		corsHandler := func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("success"))
+		}
+		newApp.AddEndpoint(http.MethodGet, "/cors-test", corsHandler)
+		newApp.AddEndpoint(http.MethodOptions, "/cors-test", corsHandler)
+
+		// Test OPTIONS request
+		optionsReq := httptest.NewRequest(http.MethodOptions, "/cors-test", nil)
+		optionsResp := httptest.NewRecorder()
+		newApp.Mux.ServeHTTP(optionsResp, optionsReq)
+
+		// Verify response code for OPTIONS
+		if optionsResp.Code != http.StatusOK {
+			t.Errorf("Expected status code %d for OPTIONS request, got %d", http.StatusOK, optionsResp.Code)
 		}
 
-		app.OptionsHandler(optionsHandler)
-		app.AddEndpoint(http.MethodGet, "/test-duplicate", testHandler)
-		app.AddEndpoint(http.MethodPost, "/test-duplicate", testHandler)
-
-		r := httptest.NewRequest(http.MethodOptions, "/test-duplicate", nil)
-		w := httptest.NewRecorder()
-		app.Mux.ServeHTTP(w, r)
-
-		if optionsCallCount != 1 {
-			t.Errorf("Expected options handler to be called once, got %d calls", optionsCallCount)
+		// Verify CORS headers for OPTIONS
+		if optionsResp.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Errorf("Expected Access-Control-Allow-Origin header to be '*', got '%s'",
+				optionsResp.Header().Get("Access-Control-Allow-Origin"))
 		}
-		if w.Code != http.StatusOK {
-			t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
+
+		if !strings.Contains(optionsResp.Header().Get("Access-Control-Allow-Methods"), "OPTIONS") {
+			t.Errorf("Expected Access-Control-Allow-Methods to contain 'OPTIONS', got '%s'",
+				optionsResp.Header().Get("Access-Control-Allow-Methods"))
+		}
+
+		// Test regular GET request
+		getReq := httptest.NewRequest(http.MethodGet, "/cors-test", nil)
+		getResp := httptest.NewRecorder()
+		newApp.Mux.ServeHTTP(getResp, getReq)
+
+		// Verify response for GET
+		if getResp.Code != http.StatusOK {
+			t.Errorf("Expected status code %d for GET request, got %d", http.StatusOK, getResp.Code)
+		}
+
+		// Verify CORS headers are also present on non-OPTIONS responses
+		if getResp.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Errorf("Expected Access-Control-Allow-Origin header to be '*' for GET request, got '%s'",
+				getResp.Header().Get("Access-Control-Allow-Origin"))
+		}
+
+		// Verify response body
+		body, _ := ioutil.ReadAll(getResp.Body)
+		if string(body) != "success" {
+			t.Errorf("Expected body 'success', got '%s'", string(body))
 		}
 	})
 }
+

@@ -31,10 +31,6 @@ type Intake struct {
 	PanicHandler func(http.ResponseWriter, *http.Request, any)
 	// GlobalMiddleware contains middleware applied to all routes
 	GlobalMiddleware []MiddleWare
-	// OptionsHandlerFunc handles OPTIONS requests
-	OptionsHandlerFunc http.HandlerFunc
-	// optionsPaths tracks paths with OPTIONS handlers
-	optionsPaths map[string]bool
 	// registeredRoutes maps paths to their HTTP methods
 	registeredRoutes map[string][]string
 }
@@ -47,7 +43,6 @@ func New() *Intake {
 	return &Intake{
 		GlobalMiddleware: make([]MiddleWare, 0),
 		Mux:              http.NewServeMux(),
-		optionsPaths:     make(map[string]bool),
 		registeredRoutes: make(map[string][]string),
 	}
 }
@@ -76,18 +71,6 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 			a.AddEndpoint(e[x][i].Verb, e[x][i].Path, e[x][i].EndpointHandler, e[x][i].MiddlewareHandlers...)
 		}
 	}
-}
-
-// OptionsHandler sets the handler for OPTIONS requests across all routes.
-// This handler will be automatically applied to all routes that have been
-// registered. It's particularly useful for implementing CORS support by
-// responding to preflight requests.
-//
-// Parameters:
-//   - h: The handler function to use for OPTIONS requests.
-func (a *Intake) OptionsHandler(h http.HandlerFunc) {
-	a.OptionsHandlerFunc = h
-	a.optionsPaths = make(map[string]bool)
 }
 
 // AddEndpoint registers a new route with the specified HTTP method and path.
@@ -119,17 +102,6 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 	a.Mux.HandleFunc(handlerKey, func(w http.ResponseWriter, r *http.Request) {
 		finalHandler(w, r)
 	})
-
-	if a.OptionsHandlerFunc != nil && !a.optionsPaths[path] {
-		optionsKey := fmt.Sprintf("%s %s", http.MethodOptions, path)
-		a.Mux.HandleFunc(optionsKey, a.OptionsHandlerFunc)
-		if methods, exists := a.registeredRoutes[path]; exists {
-			a.registeredRoutes[path] = append(methods, http.MethodOptions)
-		} else {
-			a.registeredRoutes[path] = []string{http.MethodOptions}
-		}
-		a.optionsPaths[path] = true
-	}
 }
 
 // Run starts the HTTP server and handles graceful shutdown on SIGINT/SIGTERM.

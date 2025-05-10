@@ -96,13 +96,6 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 //   - finalHandler: The handler function that will process the request
 //   - middleware: Optional route-specific middleware functions
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
-	mws := append(a.GlobalMiddleware, middleware...)
-	for i := len(mws) - 1; i >= 0; i-- {
-		if mws[i] != nil {
-			finalHandler = mws[i](finalHandler)
-		}
-	}
-
 	// Store the route in our registry
 	if methods, exists := a.registeredRoutes[path]; exists {
 		a.registeredRoutes[path] = append(methods, verb)
@@ -111,8 +104,10 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 	}
 
 	handlerKey := fmt.Sprintf("%s %s", verb, path)
-	a.Mux.HandleFunc(handlerKey, func(w http.ResponseWriter, r *http.Request) {
-		// Apply panic recovery if a handler is provided
+
+	// Apply global middleware first
+	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		// Apply panic recovery here to capture panics in both global and route middleware
 		if a.PanicHandler != nil {
 			defer func() {
 				if err := recover(); err != nil {
@@ -120,8 +115,25 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 				}
 			}()
 		}
-		finalHandler(w, r)
-	})
+
+		// Apply route middleware and the final handler
+		routeHandler := finalHandler
+		for i := len(middleware) - 1; i >= 0; i-- {
+			if middleware[i] != nil {
+				routeHandler = middleware[i](routeHandler)
+			}
+		}
+		routeHandler(w, r)
+	}
+
+	// Apply global middleware in reverse order
+	for i := len(a.GlobalMiddleware) - 1; i >= 0; i-- {
+		if a.GlobalMiddleware[i] != nil {
+			handler = a.GlobalMiddleware[i](handler)
+		}
+	}
+
+	a.Mux.HandleFunc(handlerKey, handler)
 }
 
 // Run starts the HTTP server and handles graceful shutdown on SIGINT/SIGTERM.

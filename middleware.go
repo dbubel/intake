@@ -4,6 +4,7 @@ package intake
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -92,7 +93,7 @@ func CORS(config CORSConfig) MiddleWare {
 				corsHeaders(w, config, origin)
 
 				// Handle preflight specific headers
-				w.Header().Set("Access-Control-Max-Age", string(config.MaxAge))
+				w.Header().Set("Access-Control-Max-Age", strconv.Itoa(config.MaxAge))
 
 				// Set allowed methods
 				if len(config.AllowedMethods) > 0 {

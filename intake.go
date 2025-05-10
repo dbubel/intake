@@ -168,3 +168,26 @@ func (a *Intake) GetRoutes() map[string][]string {
 	}
 	return routes
 }
+
+// AddOptionsEndpoints automatically adds HTTP OPTIONS handlers for all registered routes.
+// This is particularly useful for CORS preflight requests. The generated OPTIONS handlers
+// will respond with a 204 No Content status, and the actual CORS headers will be set by
+// any CORS middleware that has been applied.
+//
+// This method should be called after all other routes have been registered.
+func (a *Intake) AddOptionsEndpoints() {
+	for path, methods := range a.registeredRoutes {
+		// Skip if OPTIONS is already registered for this path
+		if slices.Contains(methods, http.MethodOptions) {
+			continue
+		}
+
+		// Create an OPTIONS handler that just returns 204 No Content
+		optionsHandler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}
+
+		// Register the OPTIONS handler for this path
+		a.AddEndpoint(http.MethodOptions, path, optionsHandler)
+	}
+}

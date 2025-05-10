@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake CORS Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Intake CORS Test</h1>
+    <p>This page tests CORS requests to the Intake server.</p>
+    
+    <div>
+        <button id="getBtn">GET Request</button>
+        <button id="postBtn">POST Request</button>
+        <button id="optionsBtn">OPTIONS Request</button>
+    </div>
+    
+    <h3>Response:</h3>
+    <pre id="response">Click a button to make a request...</pre>
+    
+    <h3>CORS Headers:</h3>
+    <pre id="headers"></pre>
+
+    <script>
+        // Server URL - change this to match your Intake server
+        const serverUrl = 'http://localhost:8080/api/data';
+        
+        // Display response and headers
+        function displayResult(result, headers) {
+            document.getElementById('response').textContent = 
+                typeof result === 'object' ? JSON.stringify(result, null, 2) : result;
+            
+            document.getElementById('headers').textContent = 
+                JSON.stringify(headers, null, 2);
+        }
+        
+        // GET request
+        document.getElementById('getBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(serverUrl);
+                const data = await response.json();
+                
+                // Extract headers
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    if (key.toLowerCase().includes('access-control')) {
+                        headers[key] = value;
+                    }
+                });
+                
+                displayResult(data, headers);
+            } catch (error) {
+                displayResult(`Error: ${error.message}`, {});
+            }
+        });
+        
+        // POST request
+        document.getElementById('postBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(serverUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test: 'data' })
+                });
+                
+                const data = await response.json();
+                
+                // Extract headers
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    if (key.toLowerCase().includes('access-control')) {
+                        headers[key] = value;
+                    }
+                });
+                
+                displayResult(data, headers);
+            } catch (error) {
+                displayResult(`Error: ${error.message}`, {});
+            }
+        });
+        
+        // OPTIONS request (preflight)
+        document.getElementById('optionsBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(serverUrl, {
+                    method: 'OPTIONS'
+                });
+                
+                // Extract headers
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    if (key.toLowerCase().includes('access-control')) {
+                        headers[key] = value;
+                    }
+                });
+                
+                displayResult(`Status: ${response.status} ${response.statusText}`, headers);
+            } catch (error) {
+                displayResult(`Error: ${error.message}`, {});
+            }
+        });
+    </script>
+</body>
+</html>

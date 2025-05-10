@@ -124,3 +124,18 @@ func PATCH(path string, endpointHandler http.HandlerFunc, mid ...MiddleWare) end
 func HEAD(path string, endpointHandler http.HandlerFunc, mid ...MiddleWare) endpoint {
 	return NewEndpoint(http.MethodHead, path, endpointHandler, mid...)
 }
+
+// OPTIONS creates a new endpoint for handling HTTP OPTIONS requests at the specified path.
+// This is a convenience function that calls NewEndpoint with http.MethodOptions as the method.
+// It is particularly useful for handling CORS preflight requests.
+//
+// Parameters:
+//   - path: The URL path for this endpoint
+//   - endpointHandler: The handler function for this endpoint
+//   - mid: Optional middleware functions specific to this endpoint
+//
+// Returns:
+//   - A new endpoint instance configured for OPTIONS requests
+func OPTIONS(path string, endpointHandler http.HandlerFunc, mid ...MiddleWare) endpoint {
+	return NewEndpoint(http.MethodOptions, path, endpointHandler, mid...)
+}

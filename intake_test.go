@@ -1,6 +1,7 @@
 package intake
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -197,5 +198,134 @@ func TestIntake(t *testing.T) {
 			t.Errorf("Expected body 'success', got '%s'", string(body))
 		}
 	})
-}
 
+	t.Run("test panic handler", func(t *testing.T) {
+		panicApp := New()
+		panicHandlerCalled := false
+		errorMessage := "Something went wrong"
+
+		// Set up a panic handler
+		panicApp.SetPanicHandler(func(w http.ResponseWriter, r *http.Request, err any) {
+			panicHandlerCalled = true
+			w.WriteHeader(http.StatusInternalServerError)
+			errMsg, ok := err.(string)
+			if !ok {
+				errMsg = "Unknown error"
+			}
+			w.Write([]byte(errMsg))
+		})
+
+		// Create a handler that will panic
+		panicHandler := func(w http.ResponseWriter, r *http.Request) {
+			panic(errorMessage)
+		}
+
+		// Register the panic-causing endpoint
+		panicApp.AddEndpoint(http.MethodGet, "/panic", panicHandler)
+
+		// Make a request to the endpoint
+		r := httptest.NewRequest(http.MethodGet, "/panic", nil)
+		w := httptest.NewRecorder()
+		panicApp.Mux.ServeHTTP(w, r)
+
+		// Verify the panic was caught
+		if !panicHandlerCalled {
+			t.Error("Expected panic handler to be called, but it wasn't")
+		}
+
+		// Verify response code
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+		}
+
+		// Verify response body
+		body, _ := ioutil.ReadAll(w.Body)
+		if string(body) != errorMessage {
+			t.Errorf("Expected body '%s', got '%s'", errorMessage, string(body))
+		}
+	})
+
+	t.Run("test panic handler with middleware", func(t *testing.T) {
+		panicApp := New()
+		middlewareCalled := false
+		panicHandlerCalled := false
+		requestID := "test-request-123"
+		errorMessage := "Middleware panic"
+
+		// Set up a panic handler that checks for request context
+		panicApp.SetPanicHandler(func(w http.ResponseWriter, r *http.Request, err any) {
+			panicHandlerCalled = true
+
+			// Verify middleware was executed by checking for request ID
+			if id := r.Context().Value("requestID"); id != requestID {
+				t.Errorf("Expected requestID %q in context, got %v", requestID, id)
+			}
+
+			w.WriteHeader(http.StatusInternalServerError)
+			errMsg, ok := err.(string)
+			if !ok {
+				errMsg = "Unknown error"
+			}
+			w.Write([]byte(errMsg))
+		})
+
+		// Create middleware that adds a request ID to context
+		requestIDMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				middlewareCalled = true
+
+				// Create a new request with context containing request ID
+				ctx := context.WithValue(r.Context(), "requestID", requestID)
+				r = r.WithContext(ctx)
+
+				next(w, r)
+			}
+		}
+
+		// Create another middleware that will panic
+		panicMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				// This will panic before reaching the handler
+				panic(errorMessage)
+			}
+		}
+
+		// Add the middleware to the app
+		panicApp.AddGlobalMiddleware(requestIDMiddleware)
+
+		// Create a normal handler
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("This should not be called"))
+		}
+
+		// Register the endpoint with the panic middleware
+		panicApp.AddEndpoint(http.MethodGet, "/middleware-panic", handler, panicMiddleware)
+
+		// Make a request to the endpoint
+		r := httptest.NewRequest(http.MethodGet, "/middleware-panic", nil)
+		w := httptest.NewRecorder()
+		panicApp.Mux.ServeHTTP(w, r)
+
+		// Verify the middleware was called
+		if !middlewareCalled {
+			t.Error("Expected middleware to be called, but it wasn't")
+		}
+
+		// Verify the panic was caught
+		if !panicHandlerCalled {
+			t.Error("Expected panic handler to be called, but it wasn't")
+		}
+
+		// Verify response code
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+		}
+
+		// Verify response body
+		body, _ := ioutil.ReadAll(w.Body)
+		if string(body) != errorMessage {
+			t.Errorf("Expected body '%s', got '%s'", errorMessage, string(body))
+		}
+	})
+}

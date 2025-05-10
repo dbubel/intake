@@ -47,6 +47,18 @@ func New() *Intake {
 	}
 }
 
+// SetPanicHandler sets a custom panic handler function that will be called
+// when a panic occurs during request processing. This provides a way to
+// recover from panics and return appropriate error responses instead of
+// letting the server crash.
+//
+// Parameters:
+//   - handler: The panic handler function that takes an http.ResponseWriter,
+//     an *http.Request, and the recovered panic value.
+func (a *Intake) SetPanicHandler(handler func(http.ResponseWriter, *http.Request, any)) {
+	a.PanicHandler = handler
+}
+
 // AddGlobalMiddleware adds middleware that will be applied to all routes.
 // Global middleware must be added before registering routes. The middleware
 // functions are executed in the order they are added, with the first added
@@ -100,6 +112,14 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 
 	handlerKey := fmt.Sprintf("%s %s", verb, path)
 	a.Mux.HandleFunc(handlerKey, func(w http.ResponseWriter, r *http.Request) {
+		// Apply panic recovery if a handler is provided
+		if a.PanicHandler != nil {
+			defer func() {
+				if err := recover(); err != nil {
+					a.PanicHandler(w, r, err)
+				}
+			}()
+		}
 		finalHandler(w, r)
 	})
 }

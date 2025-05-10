@@ -9,6 +9,7 @@ Intake is a lightweight, flexible HTTP router for Go applications with middlewar
 - Chainable middleware for both global and route-specific use
 - Convenient response helpers for JSON, XML, and raw data
 - Support for all standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+- Built-in CORS (Cross-Origin Resource Sharing) support
 - Bulk operations for managing multiple endpoints as a group
 - Graceful shutdown support
 - Minimal dependencies
@@ -165,29 +166,55 @@ intake.RespondXML(w, r, http.StatusOK, data)
 intake.Respond(w, r, http.StatusOK, []byte("Hello, World!"))
 ```
 
-## OPTIONS Requests
+## CORS Support
 
-Intake allows you to create middleware for handling OPTIONS requests for CORS:
+Intake provides built-in support for Cross-Origin Resource Sharing (CORS) through a configurable middleware:
 
 ```go
-// Create a middleware for handling OPTIONS requests
-optionsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        // Handle OPTIONS requests
-        if r.Method == http.MethodOptions {
-            w.Header().Set("Access-Control-Allow-Origin", "*")
-            w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-            w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, Authorization")
-            w.WriteHeader(http.StatusOK)
-            return
-        }
-        next(w, r)
-    }
+// Use default CORS settings (allow all origins)
+corsMiddleware := intake.CORS(intake.DefaultCORSConfig())
+
+// Apply CORS middleware globally to all routes
+app.AddGlobalMiddleware(corsMiddleware)
+
+// Add OPTIONS endpoints for all routes (after registering your routes)
+app.AddOptionsEndpoints()
+```
+
+### Custom CORS Configuration
+
+You can customize CORS settings to fit your security requirements:
+
+```go
+// Create custom CORS configuration
+corsConfig := intake.CORSConfig{
+    AllowedOrigins:   []string{"https://example.com", "https://*.example.com"},
+    AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut},
+    AllowedHeaders:   []string{"Origin", "Content-Type", "Authorization"},
+    ExposeHeaders:    []string{"Content-Length"},
+    AllowCredentials: true,
+    MaxAge:           3600, // 1 hour cache for preflight requests
 }
 
-// Add it as global middleware
-app.AddGlobalMiddleware(optionsMiddleware)
+// Create middleware with custom config
+corsMiddleware := intake.CORS(corsConfig)
+
+// Apply to routes
+app.AddGlobalMiddleware(corsMiddleware)
 ```
+
+### CORS Configuration Options
+
+The `CORSConfig` struct supports the following options:
+
+- `AllowedOrigins`: List of origins allowed to make cross-origin requests. Use `"*"` to allow any origin.
+- `AllowedMethods`: HTTP methods allowed for cross-origin requests.
+- `AllowedHeaders`: Headers the client can include in requests. Use `"*"` to allow any headers.
+- `ExposeHeaders`: Headers accessible to JavaScript in the browser.
+- `AllowCredentials`: Whether cookies, HTTP auth, and client certificates are allowed.
+- `MaxAge`: How long (in seconds) browsers can cache preflight responses.
+
+See the [examples/cors](https://github.com/dbubel/intake/tree/main/examples/cors) directory for a complete working example.
 
 ## Complete Example
 

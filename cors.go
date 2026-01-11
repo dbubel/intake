@@ -4,9 +4,33 @@ package intake
 
 import (
 	"net/http"
+	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
+
+type originPattern struct {
+	scheme string
+	suffix string
+}
+
+type corsPolicy struct {
+	allowedMethods     []string
+	allowedMethodsSet  map[string]struct{}
+	allowedMethodsHeader string
+	allowedHeaders     []string
+	allowedHeadersSet  map[string]struct{}
+	allowedHeadersHeader string
+	allowedOrigins     map[string]struct{}
+	allowedPatterns    []originPattern
+	allowAnyOrigin     bool
+	allowAnyHeader     bool
+	exposeHeaders      []string
+	exposeHeadersHeader string
+	allowCredentials   bool
+	maxAge             int
+}
 
 // CORSConfig defines the configuration options for the CORS middleware.
 // This struct allows for fine-grained control over CORS policy implementation.
@@ -102,19 +126,7 @@ func CORS(config CORSConfig) MiddleWare {
 		config.AllowedMethods = []string{http.MethodGet, http.MethodPost, http.MethodHead}
 	}
 
-	// Check for invalid configuration: wildcard origin with credentials
-	// According to spec, this is an invalid combination for security reasons
-	// If detected, we remove the wildcard to maintain security
-	if config.AllowCredentials && containsWildcard(config.AllowedOrigins) {
-		// Remove wildcard from allowed origins
-		newAllowedOrigins := make([]string, 0, len(config.AllowedOrigins))
-		for _, origin := range config.AllowedOrigins {
-			if origin != "*" {
-				newAllowedOrigins = append(newAllowedOrigins, origin)
-			}
-		}
-		config.AllowedOrigins = newAllowedOrigins
-	}
+	policy := buildPolicy(config)
 
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +138,7 @@ func CORS(config CORSConfig) MiddleWare {
 			}
 
 			// Check if the origin is allowed by the configured policy
-			originAllowed := isOriginAllowed(origin, config.AllowedOrigins)
+			originAllowed := policy.isOriginAllowed(origin)
 			if !originAllowed {
 				// Origin not allowed, pass through without CORS headers
 				// This maintains security by not acknowledging invalid cross-origin requests
@@ -139,18 +151,18 @@ func CORS(config CORSConfig) MiddleWare {
 			// if the CORS request is allowed by the server
 			if r.Method == http.MethodOptions {
 				// Set standard CORS headers for all responses
-				corsHeaders(w, config, origin)
+				corsHeaders(w, policy, origin)
 
 				// Set cache duration for preflight response
 				// This helps reduce the number of preflight requests
-				if config.MaxAge > 0 {
-					w.Header().Set("Access-Control-Max-Age", strconv.Itoa(config.MaxAge))
+				if policy.maxAge > 0 {
+					w.Header().Set("Access-Control-Max-Age", strconv.Itoa(policy.maxAge))
 				}
 
 				// Check if the requested HTTP method is allowed
 				requestMethod := r.Header.Get("Access-Control-Request-Method")
 				if requestMethod != "" {
-					methodAllowed := contains(config.AllowedMethods, requestMethod)
+					_, methodAllowed := policy.allowedMethodsSet[requestMethod]
 					if !methodAllowed {
 						// Method not allowed - respond with 403 Forbidden
 						w.WriteHeader(http.StatusForbidden)
@@ -159,27 +171,34 @@ func CORS(config CORSConfig) MiddleWare {
 				}
 
 				// Set the list of allowed HTTP methods
-				if len(config.AllowedMethods) > 0 {
-					w.Header().Set("Access-Control-Allow-Methods", strings.Join(config.AllowedMethods, ", "))
+				if policy.allowedMethodsHeader != "" {
+					w.Header().Set("Access-Control-Allow-Methods", policy.allowedMethodsHeader)
 				}
 
 				// Handle the requested headers check
 				requestHeaders := r.Header.Get("Access-Control-Request-Headers")
-				if len(config.AllowedHeaders) > 0 {
-					if containsWildcard(config.AllowedHeaders) {
+				if len(policy.allowedHeaders) > 0 || policy.allowAnyHeader {
+					if policy.allowAnyHeader {
 						// If wildcard is configured for headers, mirror the requested headers
 						// This allows the browser to send any headers it needs
 						if requestHeaders != "" {
 							w.Header().Set("Access-Control-Allow-Headers", requestHeaders)
 						}
 					} else {
-						// Otherwise, only allow the specifically configured headers
-						w.Header().Set("Access-Control-Allow-Headers", strings.Join(config.AllowedHeaders, ", "))
+						// Otherwise, only allow the specifically configured headers,
+						// and reject preflights that ask for disallowed headers.
+						if requestHeaders != "" && !policy.areHeadersAllowed(requestHeaders) {
+							w.WriteHeader(http.StatusForbidden)
+							return
+						}
+						if policy.allowedHeadersHeader != "" {
+							w.Header().Set("Access-Control-Allow-Headers", policy.allowedHeadersHeader)
+						}
 					}
 				} else if requestHeaders != "" {
-					// No allowed headers explicitly configured, but client requested headers
-					// Mirror the headers since no restrictions were explicitly set
-					w.Header().Set("Access-Control-Allow-Headers", requestHeaders)
+					// No allowed headers configured: reject explicit header requests.
+					w.WriteHeader(http.StatusForbidden)
+					return
 				}
 
 				// Preflight requests only need headers, not content
@@ -190,7 +209,7 @@ func CORS(config CORSConfig) MiddleWare {
 
 			// Handle actual CORS request (not a preflight)
 			// Apply the CORS headers and continue with request processing
-			corsHeaders(w, config, origin)
+			corsHeaders(w, policy, origin)
 			next(w, r)
 		}
 	}
@@ -202,14 +221,14 @@ func CORS(config CORSConfig) MiddleWare {
 //
 // Parameters:
 //   - w: The HTTP response writer to set headers on
-//   - config: The CORS configuration to apply
+//   - config: The CORS policy to apply
 //   - origin: The requesting Origin header value
-func corsHeaders(w http.ResponseWriter, config CORSConfig, origin string) {
+func corsHeaders(w http.ResponseWriter, config corsPolicy, origin string) {
 	// Set Access-Control-Allow-Origin header
 	// There are two strategies based on configuration:
 	// 1. Use "*" when wildcard origins are allowed and credentials aren't required
 	// 2. Mirror the specific origin otherwise (required when using credentials)
-	if containsWildcard(config.AllowedOrigins) && !config.AllowCredentials {
+	if config.allowAnyOrigin && !config.allowCredentials {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	} else {
 		// Echo back the specific origin
@@ -221,15 +240,120 @@ func corsHeaders(w http.ResponseWriter, config CORSConfig, origin string) {
 
 	// Set Access-Control-Allow-Credentials header if credentials are allowed
 	// This enables sending cookies, authorization headers, and TLS client certs
-	if config.AllowCredentials {
+	if config.allowCredentials {
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 	}
 
 	// Set Access-Control-Expose-Headers header if specific headers should be
 	// accessible to JavaScript in the browser
-	if len(config.ExposeHeaders) > 0 {
-		w.Header().Set("Access-Control-Expose-Headers", strings.Join(config.ExposeHeaders, ", "))
+	if config.exposeHeadersHeader != "" {
+		w.Header().Set("Access-Control-Expose-Headers", config.exposeHeadersHeader)
 	}
+}
+
+func buildPolicy(config CORSConfig) corsPolicy {
+	policy := corsPolicy{
+		allowedMethods:    config.AllowedMethods,
+		allowedMethodsSet: make(map[string]struct{}, len(config.AllowedMethods)),
+		allowedMethodsHeader: strings.Join(config.AllowedMethods, ", "),
+		allowedHeaders:    config.AllowedHeaders,
+		allowedHeadersSet: make(map[string]struct{}, len(config.AllowedHeaders)),
+		allowedHeadersHeader: strings.Join(config.AllowedHeaders, ", "),
+		allowedOrigins:    make(map[string]struct{}, len(config.AllowedOrigins)),
+		allowAnyOrigin:    false,
+		allowAnyHeader:    containsWildcard(config.AllowedHeaders),
+		exposeHeaders:     config.ExposeHeaders,
+		exposeHeadersHeader: strings.Join(config.ExposeHeaders, ", "),
+		allowCredentials:  config.AllowCredentials,
+		maxAge:            config.MaxAge,
+	}
+
+	for _, method := range config.AllowedMethods {
+		policy.allowedMethodsSet[method] = struct{}{}
+	}
+
+	for _, header := range config.AllowedHeaders {
+		policy.allowedHeadersSet[strings.ToLower(header)] = struct{}{}
+	}
+
+	for _, origin := range config.AllowedOrigins {
+		if origin == "*" {
+			policy.allowAnyOrigin = true
+			continue
+		}
+
+		if strings.HasPrefix(origin, "https://*.") {
+			policy.allowedPatterns = append(policy.allowedPatterns, originPattern{
+				scheme: "https",
+				suffix: origin[len("https://*."):],
+			})
+			continue
+		}
+		if strings.HasPrefix(origin, "http://*.") {
+			policy.allowedPatterns = append(policy.allowedPatterns, originPattern{
+				scheme: "http",
+				suffix: origin[len("http://*."):],
+			})
+			continue
+		}
+
+		policy.allowedOrigins[origin] = struct{}{}
+	}
+
+	// Invalid configuration: wildcard origin with credentials.
+	// Remove wildcard to maintain security.
+	if policy.allowCredentials && policy.allowAnyOrigin {
+		policy.allowAnyOrigin = false
+	}
+
+	return policy
+}
+
+func (p corsPolicy) isOriginAllowed(origin string) bool {
+	if p.allowAnyOrigin {
+		return true
+	}
+	if _, ok := p.allowedOrigins[origin]; ok {
+		return true
+	}
+	if len(p.allowedPatterns) == 0 {
+		return false
+	}
+
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if host == "" {
+		return false
+	}
+
+	for _, pattern := range p.allowedPatterns {
+		if u.Scheme != pattern.scheme {
+			continue
+		}
+		if host != pattern.suffix && strings.HasSuffix(host, "."+pattern.suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p corsPolicy) areHeadersAllowed(requestHeaders string) bool {
+	if requestHeaders == "" {
+		return true
+	}
+	for _, h := range strings.Split(requestHeaders, ",") {
+		header := strings.ToLower(strings.TrimSpace(h))
+		if header == "" {
+			continue
+		}
+		if _, ok := p.allowedHeadersSet[header]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // containsWildcard checks if the slice contains the wildcard "*" value.
@@ -242,60 +366,5 @@ func corsHeaders(w http.ResponseWriter, config CORSConfig, origin string) {
 // Returns:
 //   - true if the slice contains "*", false otherwise
 func containsWildcard(s []string) bool {
-	return contains(s, "*")
-}
-
-// isOriginAllowed checks if the origin is allowed based on the allowed origins list.
-// This function supports multiple matching strategies:
-// - Exact match with a specific origin
-// - Wildcard match allowing all origins
-// - Domain pattern matching (e.g., "https://*.example.com")
-//
-// Parameters:
-//   - origin: The origin from the request to check
-//   - allowedOrigins: The list of origins allowed by configuration
-//
-// Returns:
-//   - true if the origin is allowed, false otherwise
-func isOriginAllowed(origin string, allowedOrigins []string) bool {
-	if len(allowedOrigins) == 0 {
-		return false
-	}
-
-	for _, allowedOrigin := range allowedOrigins {
-		// Check for wildcard allowing all origins
-		if allowedOrigin == "*" {
-			return true
-		}
-
-		// Check for exact match
-		if allowedOrigin == origin {
-			return true
-		}
-
-		// Support for origin patterns like "https://*.example.com"
-		// This allows any subdomain of example.com to be matched by a single rule
-		if strings.HasPrefix(allowedOrigin, "https://*.") && strings.HasSuffix(origin, allowedOrigin[10:]) {
-			return true
-		}
-	}
-	return false
-}
-
-// contains checks if a string exists in a slice.
-// This is a general utility function for string slice membership testing.
-//
-// Parameters:
-//   - s: The string slice to search in
-//   - str: The string to search for
-//
-// Returns:
-//   - true if the string is found in the slice, false otherwise
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, "*")
 }

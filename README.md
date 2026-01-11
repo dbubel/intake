@@ -116,8 +116,20 @@ Intake provides helper functions for creating endpoints with specific HTTP metho
 // These all create endpoint objects
 getEndpoint := intake.GET("/users", listUsersHandler)
 postEndpoint := intake.POST("/users", createUserHandler)
-putEndpoint := intake.PUT("/users/:id", updateUserHandler)
-deleteEndpoint := intake.DELETE("/users/:id", deleteUserHandler)
+putEndpoint := intake.PUT("/users/{id}", updateUserHandler)
+deleteEndpoint := intake.DELETE("/users/{id}", deleteUserHandler)
+```
+
+### Path Parameters (Go 1.22+)
+
+Intake registers Go 1.22+ ServeMux patterns, so you can use `{name}` segments
+and retrieve them with `r.PathValue`.
+
+```go
+app.AddEndpoint(http.MethodGet, "/users/{id}", func(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    fmt.Println("user id:", id)
+})
 ```
 
 ### Managing Groups of Endpoints

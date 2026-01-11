@@ -92,7 +92,8 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 //
 // Parameters:
 //   - verb: The HTTP method (GET, POST, PUT, DELETE, etc.)
-//   - path: The URL path to register the handler for
+//   - path: The URL path to register the handler for. Go 1.22 path parameters
+//     like /users/{id} are supported.
 //   - finalHandler: The handler function that will process the request
 //   - middleware: Optional route-specific middleware functions
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
@@ -105,31 +106,32 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 
 	handlerKey := fmt.Sprintf("%s %s", verb, path)
 
-	// Apply global middleware first
-	var handler http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
-		// Apply panic recovery here to capture panics in both global and route middleware
-		if a.PanicHandler != nil {
+	// Build route-specific chain first.
+	routeHandler := finalHandler
+	for i := len(middleware) - 1; i >= 0; i-- {
+		if middleware[i] != nil {
+			routeHandler = middleware[i](routeHandler)
+		}
+	}
+
+	// Apply global middleware in reverse order
+	handler := routeHandler
+	for i := len(a.GlobalMiddleware) - 1; i >= 0; i-- {
+		if a.GlobalMiddleware[i] != nil {
+			handler = a.GlobalMiddleware[i](handler)
+		}
+	}
+
+	// Apply panic recovery last so it wraps global and route middleware.
+	if a.PanicHandler != nil {
+		inner := handler
+		handler = func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if err := recover(); err != nil {
 					a.PanicHandler(w, r, err)
 				}
 			}()
-		}
-
-		// Apply route middleware and the final handler
-		routeHandler := finalHandler
-		for i := len(middleware) - 1; i >= 0; i-- {
-			if middleware[i] != nil {
-				routeHandler = middleware[i](routeHandler)
-			}
-		}
-		routeHandler(w, r)
-	}
-
-	// Apply global middleware in reverse order
-	for i := len(a.GlobalMiddleware) - 1; i >= 0; i-- {
-		if a.GlobalMiddleware[i] != nil {
-			handler = a.GlobalMiddleware[i](handler)
+			inner(w, r)
 		}
 	}
 

@@ -193,6 +193,12 @@ app.AddGlobalMiddleware(corsMiddleware)
 app.AddOptionsEndpoints()
 ```
 
+Notes:
+- `AddOptionsEndpoints()` should be called after all routes are registered so preflight requests get a 204 response and the CORS middleware can attach headers.
+- If `AllowCredentials` is true, wildcard origins (`"*"`) are disabled and the middleware echoes the request origin instead.
+- Wildcard headers (`AllowedHeaders: []string{"*"}`) will mirror requested headers on preflight.
+- Wildcard origin patterns like `https://*.example.com` are supported.
+
 ### Custom CORS Configuration
 
 You can customize CORS settings to fit your security requirements:

@@ -5,6 +5,7 @@ package intake
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -97,9 +98,11 @@ func (a *Intake) AddEndpoints(e ...Endpoints) {
 //   - finalHandler: The handler function that will process the request
 //   - middleware: Optional route-specific middleware functions
 func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.HandlerFunc, middleware ...MiddleWare) {
-	// Store the route in our registry
+	// Store the route in our registry, avoiding duplicates.
 	if methods, exists := a.registeredRoutes[path]; exists {
-		a.registeredRoutes[path] = append(methods, verb)
+		if !slices.Contains(methods, verb) {
+			a.registeredRoutes[path] = append(methods, verb)
+		}
 	} else {
 		a.registeredRoutes[path] = []string{verb}
 	}
@@ -123,16 +126,18 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 	}
 
 	// Apply panic recovery last so it wraps global and route middleware.
-	if a.PanicHandler != nil {
-		inner := handler
-		handler = func(w http.ResponseWriter, r *http.Request) {
+	// The handler check is dynamic so SetPanicHandler can be called either
+	// before or after AddEndpoint.
+	inner := handler
+	handler = func(w http.ResponseWriter, r *http.Request) {
+		if a.PanicHandler != nil {
 			defer func() {
 				if err := recover(); err != nil {
 					a.PanicHandler(w, r, err)
 				}
 			}()
-			inner(w, r)
 		}
+		inner(w, r)
 	}
 
 	a.Mux.HandleFunc(handlerKey, handler)
@@ -146,24 +151,36 @@ func (a *Intake) AddEndpoint(verb string, path string, finalHandler http.Handler
 //
 // Parameters:
 //   - server: The configured http.Server instance to run
-func (a *Intake) Run(server *http.Server) {
+//
+// Returns:
+//   - nil on clean shutdown after a signal, or the underlying ListenAndServe /
+//     Shutdown error otherwise. http.ErrServerClosed is treated as nil.
+func (a *Intake) Run(server *http.Server) error {
 	serverErrors := make(chan error, 1)
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(osSignals)
+
 	go func() {
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	// Blocking main and waiting for shutdown.
 	select {
-	case <-serverErrors:
+	case err := <-serverErrors:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("server error: %w", err)
 	case <-osSignals:
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			if err := server.Close(); err != nil {
+			if closeErr := server.Close(); closeErr != nil {
+				return fmt.Errorf("graceful shutdown failed: %w; force close also failed: %v", err, closeErr)
 			}
+			return fmt.Errorf("graceful shutdown failed, forced close: %w", err)
 		}
+		return nil
 	}
 }
 

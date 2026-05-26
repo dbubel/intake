@@ -120,10 +120,16 @@ func DefaultCORSConfig() CORSConfig {
 // Returns:
 //   - A MiddleWare function that can be applied to HTTP handlers
 func CORS(config CORSConfig) MiddleWare {
-	// Validate the configuration
-	// Ensure we have at least one allowed method if not explicitly set
+	// Apply defaults to match the documented behaviour of CORSConfig fields
+	// when a caller passes a zero value or omits individual fields.
+	if len(config.AllowedOrigins) == 0 {
+		config.AllowedOrigins = []string{"*"}
+	}
 	if len(config.AllowedMethods) == 0 {
 		config.AllowedMethods = []string{http.MethodGet, http.MethodPost, http.MethodHead}
+	}
+	if len(config.AllowedHeaders) == 0 {
+		config.AllowedHeaders = []string{"Origin", "Accept", "Content-Type", "Authorization"}
 	}
 
 	policy := buildPolicy(config)
@@ -333,7 +339,7 @@ func (p corsPolicy) isOriginAllowed(origin string) bool {
 		if u.Scheme != pattern.scheme {
 			continue
 		}
-		if host != pattern.suffix && strings.HasSuffix(host, "."+pattern.suffix) {
+		if strings.HasSuffix(host, "."+pattern.suffix) {
 			return true
 		}
 	}

@@ -50,5 +50,7 @@ func main() {
 	fmt.Println("Example fetch: fetch('http://localhost:8080/api/data').then(r => r.json()).then(console.log)")
 
 	// Start the server
-	router.Run(server)
+	if err := router.Run(server); err != nil {
+		fmt.Println("server error:", err)
+	}
 }

@@ -46,13 +46,15 @@ func main() {
     app.AddEndpoint(http.MethodGet, "/hello", helloHandler)
     
     // Start the server with graceful shutdown
-    app.Run(&http.Server{
+    if err := app.Run(&http.Server{
         Addr:           ":8080",
         Handler:        app.Mux,
         ReadTimeout:    time.Second * 60,
         WriteTimeout:   time.Second * 60,
         MaxHeaderBytes: 1 << 20,
-    })
+    }); err != nil {
+        fmt.Println("server error:", err)
+    }
 }
 ```
 
@@ -317,13 +319,15 @@ func main() {
     
     // Start the server
     fmt.Println("Server starting on :8080")
-    app.Run(&http.Server{
+    if err := app.Run(&http.Server{
         Addr:           ":8080",
         Handler:        app.Mux,
         ReadTimeout:    time.Second * 60,
         WriteTimeout:   time.Second * 60,
         MaxHeaderBytes: 1 << 20,
-    })
+    }); err != nil {
+        fmt.Println("server error:", err)
+    }
 }
 ```
 ## License
